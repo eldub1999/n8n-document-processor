@@ -14,6 +14,7 @@ We'll build the frontend using React with the following considerations:
 2. **State Management**: Leveraging React's built-in Context API for simpler state management needs rather than introducing Redux complexity
 3. **UI Design**: Using a component-based approach with responsive design principles
 4. **API Communication**: Using the Supabase JavaScript client for direct communication with Supabase services
+5. **UI Framework**: Migrating from Chakra UI to Tailwind CSS for better performance, flexibility, and reduced bundle size
 
 ### Backend
 
@@ -83,6 +84,22 @@ Using Edge Functions allows us to keep sensitive business logic on the server wh
    - Mobile-friendly interface
    - Adaptive layouts for different screen sizes
 
+### UI Framework Migration
+
+We decided to migrate from Chakra UI to Tailwind CSS for the following reasons:
+
+1. **Performance**: Tailwind CSS offers better runtime performance due to its utility-first approach
+2. **Bundle Size**: Smaller bundle size compared to component libraries like Chakra UI
+3. **Flexibility**: More granular control over styling without fighting against pre-built component styles
+4. **Developer Experience**: Faster iteration with inline utility classes
+5. **Modern Approach**: Aligns with current industry trends for frontend styling
+
+The migration strategy involves:
+- Incremental conversion of components to maintain application stability
+- Creating Tailwind equivalents of commonly used Chakra UI patterns
+- Building a consistent theme using Tailwind's configuration
+- Testing thoroughly throughout the migration process
+
 ## Technical Constraints & Considerations
 
 1. **File Size Limits**: Implement chunked uploads for files larger than 6MB (Supabase recommendation)
@@ -95,4 +112,4 @@ Using Edge Functions allows us to keep sensitive business logic on the server wh
 1. **Version Control**: Track document versions and changes
 2. **Collaboration**: Allow sharing and collaborative editing
 3. **Advanced Search**: Full-text search across document content
-4. **Integration**: Connect with third-party services like Google Drive or Dropbox 
+4. **Integration**: Connect with third-party services like Google Drive or Dropbox
