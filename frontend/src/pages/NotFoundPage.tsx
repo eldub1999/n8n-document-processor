@@ -8,7 +8,7 @@ export default function NotFoundPage() {
       <h1 className="text-5xl font-bold mb-4">
         404
       </h1>
-      <p className="text-xl mb-8 text-gray-600">
+      <p className="text-xl mb-8 text-zinc-600">
         Page not found
       </p>
       <button 

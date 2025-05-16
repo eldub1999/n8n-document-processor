@@ -11,7 +11,7 @@ export default function HomePage() {
         <h1 className="text-4xl font-bold md:text-5xl">
           Document Management System
         </h1>
-        <p className="text-xl max-w-3xl mx-auto text-gray-600">
+        <p className="text-xl max-w-3xl mx-auto text-zinc-600">
           A simple, secure way to store, organize, and share your documents.
         </p>
         
