@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
 import { MainLayout } from './layouts/MainLayout';
 import { lazy, Suspense } from 'react';
-import { Center, Spinner } from '@chakra-ui/react';
 
 // Lazy load pages for better performance
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -14,11 +13,11 @@ const UploadPage = lazy(() => import('./pages/UploadPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const TailwindTestPage = lazy(() => import('./pages/TailwindTestPage'));
 
-// Loading component for lazy loaded routes
+// Loading component for lazy loaded routes with Tailwind CSS
 const PageLoader = () => (
-  <Center h="60vh">
-    <Spinner size="xl" color="blue.500" thickness="4px" />
-  </Center>
+  <div className="flex items-center justify-center h-60vh">
+    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+  </div>
 );
 
 function App() {
