@@ -17,11 +17,11 @@ export function MainLayout() {
   };
   
   return (
-    <Box minH="100vh" bg="gray.50">
+    <Box minH="100vh" bg="bg.subtle">
       <Flex
         as="header"
-        bg="white"
-        color="gray.800"
+        bg="bg.DEFAULT"
+        color="fg.DEFAULT"
         py={4}
         px={6}
         borderBottom="1px"
@@ -33,7 +33,7 @@ export function MainLayout() {
             <Heading 
               size="lg" 
               fontWeight="bold"
-              color="blue.600"
+              color="accent.DEFAULT"
               onClick={() => navigate('/')}
               cursor="pointer"
             >
@@ -46,18 +46,24 @@ export function MainLayout() {
                   <>
                     <Button 
                       onClick={() => navigate('/documents')} 
-                      colorScheme="blue" 
                       variant="ghost"
+                      color="accent.DEFAULT"
                     >
                       My Documents
                     </Button>
                     <Button 
                       onClick={() => navigate('/upload')} 
-                      colorScheme="blue"
+                      color="white"
+                      bg="accent.DEFAULT"
+                      _hover={{ bg: "accent.emphasis" }}
                     >
                       Upload
                     </Button>
-                    <Button onClick={handleSignOut} variant="outline">
+                    <Button 
+                      onClick={handleSignOut} 
+                      variant="outline"
+                      borderColor="gray.300"
+                    >
                       Sign Out
                     </Button>
                   </>
@@ -65,14 +71,17 @@ export function MainLayout() {
                   <>
                     <Button 
                       onClick={() => navigate('/login')} 
-                      colorScheme="blue" 
                       variant="outline"
+                      borderColor="accent.DEFAULT"
+                      color="accent.DEFAULT"
                     >
                       Sign In
                     </Button>
                     <Button 
                       onClick={() => navigate('/register')} 
-                      colorScheme="blue"
+                      color="white"
+                      bg="accent.DEFAULT"
+                      _hover={{ bg: "accent.emphasis" }}
                     >
                       Register
                     </Button>

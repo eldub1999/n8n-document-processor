@@ -30,6 +30,13 @@ export async function signUpWithEmail(email: string, password: string) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
+    options: {
+      // Skip email verification for testing purposes
+      emailRedirectTo: `${window.location.origin}/login`,
+      data: {
+        email_confirmed: true,
+      }
+    }
   });
   
   if (error) {
