@@ -257,7 +257,8 @@ globalThis.addEventListener('beforeunload', (ev) => {
 
 // Serve HTTP requests
 Deno.serve(async (req) => {
-  console.log(`Request received: ${req.method} ${new URL(req.url).pathname}`);
+  const requestStart = new Date();
+  console.log(`Request received: ${req.method} ${new URL(req.url).pathname} at ${requestStart.toISOString()}`);
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -266,7 +267,7 @@ Deno.serve(async (req) => {
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-client-info'
       }
     });
   }
@@ -285,11 +286,22 @@ Deno.serve(async (req) => {
     );
   }
 
+  let requestId: string | undefined;
+  
   try {
     console.log('Parsing request body...');
     
+    // Debug headers
+    const headers = {};
+    req.headers.forEach((value, key) => {
+      headers[key] = value;
+    });
+    console.log('Request headers:', JSON.stringify(headers, null, 2));
+    
     // Get the request data
-    const { fileId, userId, filename, contentType, requestId } = await req.json();
+    const requestData = await req.json();
+    requestId = requestData.requestId;
+    const { fileId, userId, filename, contentType } = requestData;
     
     // Log details for debugging
     console.log(`Processing document validation:
@@ -303,7 +315,7 @@ Deno.serve(async (req) => {
     // Log auth token for debugging specific request
     if (requestId === 'b742794a-e58b-4f43-b057-f56499f7d95c') {
       const authHeader = req.headers.get('Authorization');
-      console.log(`Request ID match found! Auth header: ${authHeader}`);
+      console.log(`Target request ID found! Auth header: ${authHeader}`);
     }
 
     // Check required parameters
@@ -311,7 +323,8 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Missing required parameters',
-          requiredParams: ['fileId', 'userId', 'filename', 'contentType']
+          requiredParams: ['fileId', 'userId', 'filename', 'contentType'],
+          requestId
         }),
         { 
           status: 400,
@@ -323,100 +336,107 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get the file from temporary storage
-    console.log(`Fetching file ${fileId} from temporary storage...`);
-    const { data: fileData, error: fileError } = await supabaseClient
-      .storage
-      .from(TEMP_BUCKET)
-      .download(fileId);
+    try {
+      // Get the file from temporary storage
+      console.log(`Fetching file ${fileId} from temporary storage...`);
+      const { data: fileData, error: fileError } = await supabaseClient
+        .storage
+        .from(TEMP_BUCKET)
+        .download(fileId);
 
-    if (fileError || !fileData) {
-      console.error('Error fetching file:', fileError);
-      return handleError(
-        new Error(`Failed to fetch file: ${fileError?.message || 'File not found'}`), 
-        404
-      );
-    }
+      if (fileError) {
+        console.error('Error fetching file:', fileError);
+        throw new Error(`Failed to fetch file: ${fileError.message}`);
+      }
+      
+      if (!fileData) {
+        throw new Error('File not found in temporary storage');
+      }
 
-    // Generate a hash of the file content for deduplication
-    console.log('Computing file hash for deduplication...');
-    const fileBuffer = await fileData.arrayBuffer();
-    const contentHash = await generateContentHash(new Uint8Array(fileBuffer));
-    console.log(`File hash: ${contentHash}`);
+      // Generate a hash of the file content for deduplication
+      console.log('Computing file hash for deduplication...');
+      const fileBuffer = await fileData.arrayBuffer();
+      const contentHash = await generateContentHash(new Uint8Array(fileBuffer));
+      console.log(`File hash: ${contentHash}`);
 
-    // Check if this hash already exists in the database (deduplication)
-    console.log('Checking for duplicates...');
-    const { data: existingDocs, error: queryError } = await supabaseClient
-      .from('documents')
-      .select('id, filename')
-      .eq('content_hash', contentHash)
-      .limit(1);
+      // Check if this hash already exists in the database (deduplication)
+      console.log('Checking for duplicates...');
+      const { data: existingDocs, error: queryError } = await supabaseClient
+        .from('documents')
+        .select('id, filename')
+        .eq('content_hash', contentHash)
+        .limit(1);
 
-    if (queryError) {
-      console.error('Database query error:', queryError);
-      return handleError(
-        new Error(`Database error: ${queryError.message}`),
-        500
-      );
-    }
+      if (queryError) {
+        console.error('Database query error:', queryError);
+        throw new Error(`Database error: ${queryError.message}`);
+      }
 
-    // If duplicate found, return error with details
-    if (existingDocs && existingDocs.length > 0) {
-      console.log(`Duplicate found: ${existingDocs[0].id} - ${existingDocs[0].filename}`);
+      // If duplicate found, return error with details
+      if (existingDocs && existingDocs.length > 0) {
+        console.log(`Duplicate found: ${existingDocs[0].id} - ${existingDocs[0].filename}`);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            isDuplicate: true,
+            existingDocumentId: existingDocs[0].id,
+            existingFilename: existingDocs[0].filename,
+            message: `This file already exists as "${existingDocs[0].filename}"`,
+            requestId
+          }),
+          { 
+            status: 409, // Conflict
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*'
+            }
+          }
+        );
+      }
+
+      // File validated successfully, no duplicates found
+      console.log('Validation successful, no duplicates found');
+      const requestEnd = new Date();
+      const processingTime = requestEnd.getTime() - requestStart.getTime();
+      
       return new Response(
         JSON.stringify({
-          success: false,
-          isDuplicate: true,
-          existingDocumentId: existingDocs[0].id,
-          existingFilename: existingDocs[0].filename,
-          message: `This file already exists as "${existingDocs[0].filename}"`
+          success: true,
+          fileId,
+          contentHash,
+          message: 'File validated successfully',
+          requestId,
+          processingTimeMs: processingTime
         }),
         { 
-          status: 409, // Conflict
+          status: 200,
           headers: {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*'
           }
         }
       );
+    } catch (error) {
+      return handleError(error, 500, requestId);
     }
-
-    // File validated successfully, no duplicates found
-    console.log('Validation successful, no duplicates found');
-    return new Response(
-      JSON.stringify({
-        success: true,
-        fileId,
-        contentHash,
-        message: 'File validated successfully'
-      }),
-      { 
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        }
-      }
-    );
   } catch (error) {
-    // Add requestId to the error if it exists
-    try {
-      const { requestId } = await req.json();
-      (error as any).requestId = requestId;
-    } catch {}
+    // Handle JSON parsing errors
+    if (error instanceof SyntaxError) {
+      return handleError(new Error('Invalid JSON in request body'), 400, requestId);
+    }
     
-    return handleError(error as Error);
+    return handleError(error, 500, requestId);
   }
 });
 
 // Helper to log and format error responses
-function handleError(error: Error, status = 500): Response {
-  console.error('Document validation error:', error);
+function handleError(error: Error, status = 500, requestId?: string): Response {
+  console.error(`Document validation error [${requestId || 'unknown'}]:`, error);
   return new Response(
     JSON.stringify({ 
       error: error.message,
       success: false,
-      requestId: (error as any).requestId || undefined
+      requestId: requestId
     }),
     { 
       status: status,

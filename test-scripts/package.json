@@ -1,19 +1,16 @@
 {
-  "name": "schema-test",
+  "name": "supabase-edge-function-tests",
   "version": "1.0.0",
-  "description": "Test script for database schema updates",
-  "main": "schema-test.ts",
   "type": "module",
+  "description": "Test scripts for Supabase Edge Functions",
+  "main": "invoke-validation-function.js",
   "scripts": {
-    "test": "ts-node schema-test.ts"
+    "test": "node invoke-validation-function.js",
+    "test:simple": "node invoke-simple-function.js",
+    "test:bypass": "node invoke-bypass-function.js"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.38.5",
-    "dotenv": "^16.3.1"
-  },
-  "devDependencies": {
-    "@types/node": "^20.10.5",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
+    "@supabase/supabase-js": "^2.39.7",
+    "node-fetch": "^3.3.2"
   }
-} 
+}
