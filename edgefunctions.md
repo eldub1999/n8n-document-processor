@@ -85,6 +85,18 @@ Supabase Edge Functions are serverless functions that run on Deno, providing a w
    - Use service role keys cautiously
    - Implement proper authorization checks
 
+4. **Correct Module Imports**:
+   - Be careful with Deno module imports - they can change between versions
+   - Use correct import paths and exports for crypto and other modules
+   - When using hashing, use the current API:
+     ```typescript
+     // Correct way to import and use crypto in Deno
+     import { create } from "https://deno.land/std@0.202.0/crypto/mod.ts";
+     
+     // Create a hash
+     const hash = await create("sha256").update(data).digest();
+     ```
+
 ## Testing Strategies
 
 ### Local Testing
@@ -180,6 +192,16 @@ Supabase Edge Functions are serverless functions that run on Deno, providing a w
   - Check RLS policies for proper access control
   - Test with minimal database operations first
   - Use transaction management for complex operations
+
+### Boot Errors
+- **Symptoms**: Function fails to start with message like "Function failed to start" or error logs showing "worker boot error"
+- **Solutions**:
+  - Check module import paths - they can change between Deno versions
+  - Verify that all imported modules are correctly referenced
+  - Look for syntax errors in the function code
+  - Watch for incorrect API usage, such as the crypto module imports
+  - Implement incremental testing with minimal functions to isolate issues
+  - Check environment variables that might be referenced during initialization
 
 ## Common Edge Function Patterns
 
@@ -281,4 +303,10 @@ function requireAuth(handler) {
 5. **Environment Management**:
    - Local Docker environment may face conflicts and resource limitations
    - Remote deployment and testing can be more reliable than local testing
-   - Use direct client invocation for reliable testing regardless of environment 
+   - Use direct client invocation for reliable testing regardless of environment
+
+6. **Module Import Issues**:
+   - Be careful with module versions and import paths
+   - The error `Uncaught SyntaxError: The requested module does not provide an export named 'X'` usually indicates incorrect import paths or API usage
+   - Use incremental deployment and testing with minimal code to isolate import issues
+   - Check Deno documentation for current module API usage patterns 
