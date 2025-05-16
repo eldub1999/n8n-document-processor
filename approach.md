@@ -36,6 +36,29 @@ Instead of storing files directly in the database, we'll use a hybrid approach:
 
 This approach provides better performance and scalability compared to storing files directly in the database.
 
+### Document Deduplication Strategy
+
+To ensure each document in the system is unique:
+- We'll implement a hash-based deduplication system using file content hashing
+- During upload, the document hash will be calculated and compared against existing documents
+- If a duplicate is detected, users will be notified and given options to:
+  - Skip the upload (default)
+  - Replace the existing document with a new version (see versioning)
+  - Rename and upload as a distinct document
+- This approach prevents redundant storage while maintaining user flexibility
+
+### Document Versioning and Archiving
+
+To support document updates while preserving history:
+- A versioning system will track document changes over time
+- When a document is replaced, the previous version will be:
+  - Moved to an archive storage location
+  - Linked to the current version through a version chain
+  - Retained for a 5-year period per policy requirements
+- Users can access version history to view or restore previous versions
+- Metadata will track version numbers, creation dates, and modification details
+- This approach balances storage optimization with historical record preservation
+
 ### Database Schema
 
 We'll create a `documents` table with the following structure:
@@ -48,6 +71,18 @@ We'll create a `documents` table with the following structure:
 - `created_at`: Timestamp of upload
 - `updated_at`: Timestamp of last update
 - `description`: Optional description of the document
+- `content_hash`: Hash of the document content for deduplication
+- `version`: Current version number of the document
+- `is_latest`: Boolean flag indicating if this is the latest version
+
+A complementary `document_versions` table will track version history:
+- `id`: UUID primary key
+- `document_id`: Reference to the main document
+- `version_number`: Sequential version number
+- `storage_path`: Path to the archived version in storage
+- `created_at`: When this version was created
+- `created_by`: Who created this version
+- `expiry_date`: When this archived version can be removed (5 years after creation)
 
 This schema allows us to efficiently query documents, while maintaining a clean separation between metadata and file storage.
 
@@ -65,6 +100,8 @@ We'll use Supabase Edge Functions for operations that require server-side proces
 2. **Search Functionality**: Implement complex search logic beyond what can be done client-side
 3. **Authorization Checks**: Additional security validations beyond RLS
 4. **Notifications**: Send email notifications for document updates (future enhancement)
+5. **Deduplication**: Detect duplicate documents during upload process
+6. **Versioning**: Manage document versions and archiving
 
 Using Edge Functions allows us to keep sensitive business logic on the server while maintaining a serverless architecture.
 
@@ -74,11 +111,14 @@ Using Edge Functions allows us to keep sensitive business logic on the server wh
    - Support for drag-and-drop uploads
    - Progress indicators for large files
    - Client-side validation before upload
+   - Duplicate detection and user notifications
 
 2. **Document Management**:
    - Intuitive list view with sorting and filtering
    - Preview functionality for common file types
    - Batch operations for efficiency
+   - Version history access and management
+   - Options to replace existing documents with new versions
 
 3. **Responsive Design**:
    - Mobile-friendly interface
@@ -106,6 +146,7 @@ The migration strategy involves:
 2. **Security**: Implement proper CORS settings and validate file types to prevent security vulnerabilities
 3. **Performance**: Optimize for both upload and retrieval efficiency
 4. **Cost Efficiency**: Design with Supabase pricing tiers in mind to optimize for cost
+5. **Storage Management**: Implement automated cleanup for archived versions past retention period
 
 ## Future Enhancements
 

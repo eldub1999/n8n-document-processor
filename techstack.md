@@ -57,10 +57,44 @@ This document outlines the technology stack used in our Document Management Appl
   - `created_at`: Timestamp of upload
   - `updated_at`: Timestamp of last update
   - `description`: Optional description of the document
+  - `content_hash`: Hash of file content for deduplication
+  - `version`: Current version number
+  - `is_latest`: Boolean flag for latest version
+
+- **document_versions**: Table for tracking document version history:
+  - `id`: UUID primary key
+  - `document_id`: Reference to parent document
+  - `version_number`: Sequential version number
+  - `storage_path`: Path to archived version
+  - `created_at`: Version creation timestamp
+  - `created_by`: User who created the version
+  - `expiry_date`: Calculated 5-year retention date
 
 ### Storage Configuration
 
-- **Documents Bucket**: For storing uploaded files with proper access controls
+- **Documents Bucket**: For storing current document versions
+- **Archive Bucket**: For storing previous document versions
+
+### Edge Functions
+
+- **document-processing**: Extracts metadata from uploaded documents
+- **document-validation**: Validates document integrity and checks for duplicates
+- **document-versioning**: Handles document replacement and version management (planned)
+
+## Document Management Features
+
+### Deduplication System
+
+- **Content Hashing**: SHA-256 for generating unique document fingerprints
+- **Duplicate Detection**: Server-side comparison of file hashes
+- **Conflict Resolution**: UI components for handling duplicate uploads
+
+### Versioning & Archiving
+
+- **Version Control**: System for tracking document revisions
+- **Archiving Strategy**: Automated storage of previous versions
+- **Retention Policy**: 5-year retention period with automated cleanup
+- **Version Access**: UI components for accessing document history
 
 ## Development & Deployment
 
