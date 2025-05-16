@@ -1,4 +1,3 @@
-import { Box, Container, Flex, Heading, Button } from '@chakra-ui/react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { signOut } from '../services/authService';
@@ -17,90 +16,65 @@ export function MainLayout() {
   };
   
   return (
-    <Box minH="100vh" bg="bg.subtle">
-      <Flex
-        as="header"
-        bg="bg.DEFAULT"
-        color="fg.DEFAULT"
-        py={4}
-        px={6}
-        borderBottom="1px"
-        borderColor="gray.200"
-        boxShadow="sm"
-      >
-        <Container maxW="container.xl">
-          <Flex align="center" justify="space-between" w="full">
-            <Heading 
-              size="lg" 
-              fontWeight="bold"
-              color="accent.DEFAULT"
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white text-gray-800 py-4 px-6 border-b border-gray-200 shadow-sm">
+        <div className="container mx-auto max-w-7xl">
+          <div className="flex items-center justify-between w-full">
+            <h1 
+              className="text-2xl font-bold text-blue-600 cursor-pointer"
               onClick={() => navigate('/')}
-              cursor="pointer"
             >
               Document Manager
-            </Heading>
+            </h1>
             
             {!loading && (
-              <Flex gap={4}>
+              <div className="flex gap-4">
                 {user ? (
                   <>
-                    <Button 
+                    <button 
                       onClick={() => navigate('/documents')} 
-                      variant="ghost"
-                      color="accent.DEFAULT"
+                      className="px-4 py-2 text-blue-600 hover:bg-gray-100 rounded-md transition-colors"
                     >
                       My Documents
-                    </Button>
-                    <Button 
+                    </button>
+                    <button 
                       onClick={() => navigate('/upload')} 
-                      color="white"
-                      bg="accent.DEFAULT"
-                      _hover={{ bg: "accent.emphasis" }}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                     >
                       Upload
-                    </Button>
-                    <Button 
+                    </button>
+                    <button 
                       onClick={handleSignOut} 
-                      variant="outline"
-                      borderColor="gray.300"
+                      className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
                     >
                       Sign Out
-                    </Button>
+                    </button>
                   </>
                 ) : (
                   <>
-                    <Button 
+                    <button 
                       onClick={() => navigate('/login')} 
-                      variant="outline"
-                      borderColor="accent.DEFAULT"
-                      color="accent.DEFAULT"
+                      className="px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 transition-colors"
                     >
                       Sign In
-                    </Button>
-                    <Button 
+                    </button>
+                    <button 
                       onClick={() => navigate('/register')} 
-                      color="white"
-                      bg="accent.DEFAULT"
-                      _hover={{ bg: "accent.emphasis" }}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                     >
                       Register
-                    </Button>
+                    </button>
                   </>
                 )}
-              </Flex>
+              </div>
             )}
-          </Flex>
-        </Container>
-      </Flex>
+          </div>
+        </div>
+      </header>
       
-      <Container 
-        as="main" 
-        maxW="container.xl" 
-        py={8} 
-        px={{ base: 4, md: 6 }}
-      >
+      <main className="container mx-auto max-w-7xl py-8 px-4 md:px-6">
         <Outlet />
-      </Container>
-    </Box>
+      </main>
+    </div>
   );
 } 

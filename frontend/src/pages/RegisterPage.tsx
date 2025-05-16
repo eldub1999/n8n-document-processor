@@ -1,13 +1,3 @@
-import { 
-  Box, 
-  Button, 
-  Heading, 
-  Input,
-  Flex,
-  Text,
-  Link,
-  Field
-} from '@chakra-ui/react';
 import { useState } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { signUpWithEmail } from '../services/authService';
@@ -72,79 +62,69 @@ export default function RegisterPage() {
   };
   
   return (
-    <Flex minH="70vh" align="center" justify="center">
-      <Box 
-        w="100%" 
-        maxW="400px" 
-        p={8} 
-        borderWidth="1px" 
-        borderColor="gray.200"
-        borderRadius="lg" 
-        bg="bg.DEFAULT"
-        boxShadow="md"
+    <div className="flex min-h-[70vh] items-center justify-center">
+      <div 
+        className="w-full max-w-md p-8 bg-white border border-gray-200 rounded-lg shadow-md"
       >
-        <Heading as="h1" size="xl" textAlign="center" mb={6} color="fg.DEFAULT">
+        <h1 className="text-3xl font-bold text-center mb-6 text-gray-800">
           Create Account
-        </Heading>
+        </h1>
         
         <form onSubmit={handleSubmit}>
-          <Flex direction="column" gap={4}>
-            <Field.Root invalid={!!errors.email}>
-              <Field.Label>Email</Field.Label>
-              <Input 
+          <div className="flex flex-col gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <input 
                 type="email" 
                 value={email} 
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your@email.com"
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.email ? 'border-red-500' : 'border-gray-300'}`}
               />
-              {errors.email && <Field.ErrorText>{errors.email}</Field.ErrorText>}
-            </Field.Root>
+              {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
+            </div>
             
-            <Field.Root invalid={!!errors.password}>
-              <Field.Label>Password</Field.Label>
-              <Input 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <input 
                 type="password" 
                 value={password} 
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="At least 6 characters"
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.password ? 'border-red-500' : 'border-gray-300'}`}
               />
-              {errors.password && <Field.ErrorText>{errors.password}</Field.ErrorText>}
-            </Field.Root>
+              {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
+            </div>
             
-            <Field.Root invalid={!!errors.confirmPassword}>
-              <Field.Label>Confirm Password</Field.Label>
-              <Input 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+              <input 
                 type="password" 
                 value={confirmPassword} 
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Repeat your password"
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.confirmPassword ? 'border-red-500' : 'border-gray-300'}`}
               />
-              {errors.confirmPassword && <Field.ErrorText>{errors.confirmPassword}</Field.ErrorText>}
-            </Field.Root>
+              {errors.confirmPassword && <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>}
+            </div>
             
-            <Button 
+            <button 
               type="submit" 
-              width="full" 
-              mt={4}
-              loading={isLoading}
-              bg="accent.DEFAULT"
-              color="white"
-              _hover={{ bg: "accent.emphasis" }}
+              className={`w-full py-2 px-4 mt-4 bg-blue-600 text-white rounded-md font-medium ${isLoading ? 'opacity-70 cursor-wait' : 'hover:bg-blue-700'} transition-colors`}
+              disabled={isLoading}
             >
-              Sign Up
-            </Button>
-          </Flex>
+              {isLoading ? 'Creating account...' : 'Sign Up'}
+            </button>
+          </div>
         </form>
         
-        <Text mt={4} textAlign="center">
+        <p className="mt-4 text-center text-gray-600">
           Already have an account?{' '}
-          <RouterLink to="/login">
-            <Link color="accent.DEFAULT">
-              Sign in here
-            </Link>
+          <RouterLink to="/login" className="text-blue-600 hover:text-blue-800">
+            Sign in here
           </RouterLink>
-        </Text>
-      </Box>
-    </Flex>
+        </p>
+      </div>
+    </div>
   );
 } 

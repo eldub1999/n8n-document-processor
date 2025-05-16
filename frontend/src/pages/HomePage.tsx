@@ -1,4 +1,3 @@
-import { Heading, Text, VStack, Button, Box } from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
@@ -7,33 +6,31 @@ export default function HomePage() {
   const { user } = useAuth();
   
   return (
-    <Box py={12}>
-      <VStack spacing={6} textAlign="center">
-        <Heading as="h1" size="2xl">
+    <div className="py-12">
+      <div className="flex flex-col items-center space-y-6 text-center">
+        <h1 className="text-4xl font-bold md:text-5xl">
           Document Management System
-        </Heading>
-        <Text fontSize="xl" maxW="container.md" mx="auto">
+        </h1>
+        <p className="text-xl max-w-3xl mx-auto text-gray-600">
           A simple, secure way to store, organize, and share your documents.
-        </Text>
+        </p>
         
         {!user ? (
-          <Button 
-            size="lg" 
-            colorScheme="blue" 
+          <button 
+            className="px-6 py-3 text-lg font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
             onClick={() => navigate('/login')}
           >
             Get Started
-          </Button>
+          </button>
         ) : (
-          <Button 
-            size="lg" 
-            colorScheme="blue" 
+          <button 
+            className="px-6 py-3 text-lg font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
             onClick={() => navigate('/documents')}
           >
             View My Documents
-          </Button>
+          </button>
         )}
-      </VStack>
-    </Box>
+      </div>
+    </div>
   );
 } 
