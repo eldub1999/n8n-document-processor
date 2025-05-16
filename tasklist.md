@@ -74,11 +74,13 @@
 - [ ] Create document-versioning edge function for version management
 
 ## Database Schema Updates
-- [ ] Add content_hash field to documents table
-- [ ] Add version and is_latest fields to documents table
-- [ ] Add jurisdiction, county, and document_type fields to documents table
-- [ ] Create document_versions table with appropriate fields
-- [ ] Implement database triggers for versioning automation
+- [x] Add content_hash field to documents table
+- [x] Add version and is_latest fields to documents table
+- [x] Add jurisdiction, county, and document_type fields to documents table
+- [x] Create document_versions table with appropriate fields
+- [x] Implement database triggers for versioning automation
+- [x] Create archive storage bucket for document versions
+- [x] Implement cleanup function for expired versions
 
 ## Security & Performance
 - [ ] Set up proper CORS configurations
@@ -100,6 +102,7 @@
 ## Documentation
 - [x] Update approach document with UI migration strategy
 - [x] Document current technology stack in techstack.md
+- [x] Document database schema and migrations
 - [ ] Create comprehensive README
 - [ ] Document API endpoints
 - [ ] Create user guide for application features
