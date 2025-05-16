@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.4'
+import { createHash } from 'https://deno.land/std@0.202.0/crypto/mod.ts';
 
 // Initialize Supabase client with environment variables
 const supabaseClient = createClient(
@@ -20,6 +21,38 @@ interface ValidationResult {
   valid: boolean;
   reasons?: string[];
   metadata?: Record<string, any>;
+  contentHash?: string;
+  isDuplicate?: boolean;
+  duplicateDocumentId?: string;
+}
+
+// Generate SHA-256 hash of file content
+async function generateContentHash(fileData: Uint8Array): Promise<string> {
+  const hashBuffer = await createHash('sha256').update(fileData).digest();
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+// Check if document with the same content hash already exists
+async function checkForDuplicates(contentHash: string): Promise<{ isDuplicate: boolean, documentId?: string }> {
+  const { data, error } = await supabaseClient
+    .from('documents')
+    .select('id')
+    .eq('content_hash', contentHash)
+    .eq('is_latest', true)
+    .limit(1);
+  
+  if (error) {
+    console.error('Error checking for duplicates:', error);
+    return { isDuplicate: false };
+  }
+  
+  if (data && data.length > 0) {
+    return { isDuplicate: true, documentId: data[0].id };
+  }
+  
+  return { isDuplicate: false };
 }
 
 // Validate a document based on its content type and content
@@ -40,6 +73,25 @@ async function validateDocument(
   if (fileData.length === 0) {
     result.valid = false;
     result.reasons?.push('File is empty');
+    return result;
+  }
+
+  // Generate content hash for deduplication
+  try {
+    const contentHash = await generateContentHash(fileData);
+    result.contentHash = contentHash;
+    
+    // Check for duplicates
+    const { isDuplicate, documentId } = await checkForDuplicates(contentHash);
+    if (isDuplicate) {
+      result.valid = false;
+      result.isDuplicate = true;
+      result.duplicateDocumentId = documentId;
+      result.reasons?.push('Document with identical content already exists');
+      return result;
+    }
+  } catch (error) {
+    console.error('Error generating content hash:', error);
   }
 
   // Basic content validation based on content type
@@ -110,6 +162,18 @@ async function processValidation(request: ValidationRequest): Promise<Record<str
       request.filename
     );
     
+    // Check for duplicates first
+    if (validationResult.isDuplicate) {
+      console.log(`Duplicate document detected: ${request.filename}`);
+      return { 
+        success: true, 
+        valid: false, 
+        isDuplicate: true,
+        duplicateDocumentId: validationResult.duplicateDocumentId,
+        reasons: validationResult.reasons
+      };
+    }
+    
     // 3. If valid, move to permanent storage
     if (validationResult.valid) {
       // Generate a unique path for the file
@@ -137,7 +201,10 @@ async function processValidation(request: ValidationRequest): Promise<Record<str
           content_type: request.contentType,
           size_bytes: fileUint8Array.length,
           created_by: request.userId,
-          metadata: validationResult.metadata
+          metadata: validationResult.metadata,
+          content_hash: validationResult.contentHash,
+          version: 1,
+          is_latest: true
         })
         .select()
         .single();
@@ -161,7 +228,8 @@ async function processValidation(request: ValidationRequest): Promise<Record<str
         success: true, 
         valid: true,
         documentId: document.id,
-        metadata: validationResult.metadata
+        metadata: validationResult.metadata,
+        contentHash: validationResult.contentHash
       };
     } else {
       // If invalid, return validation errors
@@ -216,14 +284,50 @@ Deno.serve(async (req) => {
   }
   
   try {
-    const validationRequest = await req.json() as ValidationRequest;
+    // Get the JWT token from the Authorization header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Missing or invalid Authorization header' }),
+        { 
+          status: 401, 
+          headers: { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          } 
+        }
+      );
+    }
+
+    // Extract the token
+    const token = authHeader.replace('Bearer ', '');
+    
+    // Verify the token and get the user
+    const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
+    if (userError || !userData.user) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid or expired token', details: userError?.message }),
+        { 
+          status: 401, 
+          headers: { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          } 
+        }
+      );
+    }
+
+    // Continue with regular request processing
+    const validationRequest = await req.json();
+    
+    // Use the user's ID from the verified token instead of trusting the request body
+    validationRequest.userId = userData.user.id;
     
     // Validate request parameters
-    if (!validationRequest.fileId || !validationRequest.userId || 
-        !validationRequest.filename || !validationRequest.contentType) {
+    if (!validationRequest.fileId || !validationRequest.filename || !validationRequest.contentType) {
       return new Response(
         JSON.stringify({ 
-          error: 'Invalid request. Required fields: fileId, userId, filename, contentType' 
+          error: 'Invalid request. Required fields: fileId, filename, contentType' 
         }),
         { 
           status: 400, 
@@ -242,7 +346,8 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         message: 'Document validation started',
-        fileId: validationRequest.fileId 
+        fileId: validationRequest.fileId,
+        requestId: crypto.randomUUID() // Return a unique ID for this request
       }),
       { 
         status: 202, 

@@ -68,8 +68,8 @@
 ## Edge Functions
 - [x] Implement document metadata extraction function
 - [x] Create document validation and sanitization function
+- [x] Implement user authorization checks with JWT authentication
 - [ ] Build document search function with full-text search
-- [ ] Implement user authorization checks
 - [ ] Extend document-validation function to detect duplicates
 - [ ] Create document-versioning edge function for version management
 
@@ -83,8 +83,9 @@
 - [x] Implement cleanup function for expired versions
 
 ## Security & Performance
-- [ ] Set up proper CORS configurations
+- [x] Set up proper CORS configurations
 - [x] Implement client-side file validation
+- [x] Add JWT authentication to Edge Functions
 - [ ] Configure rate limiting for uploads
 - [ ] Optimize file uploads for large documents
 - [ ] Implement access control roles for document management (future)

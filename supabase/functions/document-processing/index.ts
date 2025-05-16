@@ -112,6 +112,18 @@ globalThis.addEventListener('beforeunload', (ev) => {
 
 // Serve HTTP requests
 Deno.serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+      }
+    });
+  }
+  
   // Only accept POST requests
   if (req.method !== 'POST') {
     return new Response(
@@ -121,6 +133,40 @@ Deno.serve(async (req) => {
   }
   
   try {
+    // Get the JWT token from the Authorization header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Missing or invalid Authorization header' }),
+        { 
+          status: 401, 
+          headers: { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          } 
+        }
+      );
+    }
+
+    // Extract the token
+    const token = authHeader.replace('Bearer ', '');
+    
+    // Verify the token and get the user
+    const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
+    if (userError || !userData.user) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid or expired token', details: userError?.message }),
+        { 
+          status: 401, 
+          headers: { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          } 
+        }
+      );
+    }
+
+    // Continue with regular request processing
     const { documentId } = await req.json();
     
     if (!documentId) {
@@ -137,7 +183,8 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         message: 'Document processing started',
-        documentId 
+        documentId,
+        requestId: crypto.randomUUID() // Return a unique ID for this request
       }),
       { 
         status: 202, 
