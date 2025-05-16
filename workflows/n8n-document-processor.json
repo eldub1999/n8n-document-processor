@@ -32,12 +32,12 @@
             {
               "value1": "={{ $json.mimeType }}",
               "operation": "contains",
-              "value2": "application/pdf"
+              "value2": "pdf"
             }
           ]
         }
       },
-      "name": "Is PDF Document?",
+      "name": "Is PDF?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
       "position": [
@@ -47,27 +47,28 @@
     },
     {
       "parameters": {
-        "resource": "file",
         "operation": "download",
         "fileId": "={{ $json.id }}",
-        "options": {
-          "binaryPropertyName": "document"
-        }
+        "options": {}
       },
       "name": "Download PDF",
       "type": "n8n-nodes-base.googleDrive",
-      "typeVersion": 1,
+      "typeVersion": 2,
       "position": [
         650,
         200
-      ]
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": "google_drive_credentials"
+      }
     },
     {
       "parameters": {
-        "jsCode": "// Extract and format document metadata\nconst item = $input.item;\nreturn {\n  json: {\n    fileName: item.json.name,\n    fileId: item.json.id,\n    mimeType: item.json.mimeType,\n    createdTime: item.json.createdTime,\n    webViewLink: item.json.webViewLink,\n    source: 'google_drive',\n    status: 'downloaded',\n    document: item.binary.document\n  }\n};"
+        "operation": "toText",
+        "binaryData": "={{ $binary.data }}"
       },
-      "name": "Prepare PDF Metadata",
-      "type": "n8n-nodes-base.function",
+      "name": "PDF to Text",
+      "type": "n8n-nodes-base.pdfConvert",
       "typeVersion": 1,
       "position": [
         850,
@@ -76,105 +77,72 @@
     },
     {
       "parameters": {
-        "operation": "insert",
-        "table": "documents",
-        "schema": "public",
-        "columns": {
-          "title": "={{ $json.fileName }}",
-          "source_id": "={{ $json.fileId }}",
-          "source_type": "google_drive",
-          "mime_type": "={{ $json.mimeType }}",
-          "status": "downloaded",
-          "metadata": "={{ JSON.stringify($json) }}",
-          "created_at": "={{ new Date().toISOString() }}"
-        },
-        "returnFields": "id, title, source_id"
+        "dataPropertyName": "document",
+        "items": {
+          "id": "={{ $json.id }}",
+          "name": "={{ $json.name }}",
+          "mimeType": "={{ $json.mimeType }}",
+          "createdTime": "={{ $json.createdTime }}",
+          "webViewLink": "={{ $json.webViewLink }}",
+          "content": "={{ $json.text }}",
+          "chunk_number": 0,
+          "total_chunks": 1
+        }
       },
-      "name": "Insert PDF Document",
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
+      "name": "Process PDF",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
       "position": [
         1050,
-        200
-      ],
-      "credentials": {
-        "supabaseApi": {
-          "id": "supabase-credentials",
-          "name": "Supabase API"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "functionName": "extractTextFromPdf",
-        "binaryPropertyName": "document",
-        "options": {
-          "outputPropertyName": "rawText"
-        }
-      },
-      "name": "Extract Text from PDF",
-      "type": "n8n-nodes-base.function:executeFunction",
-      "typeVersion": 1,
-      "position": [
-        1250,
-        200
-      ],
-      "executeFunction": {
-        "code": "async function extractTextFromPdf(binaryData) {\n  // This is where PDF extraction would happen\n  // In n8n, you would typically use the PDF Extract node\n  // For this template, we are simulating the extraction\n  return {\n    rawText: 'Extracted text from PDF document would appear here.'\n  };\n}"
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "// Process text to RAG-optimized markdown format\nconst item = $input.item;\nconst text = item.json.rawText;\n\n// Split into chunks, clean, and format\nconst chunks = text.split('\\n\\n').filter(chunk => chunk.trim().length > 0);\nconst markdown = chunks.map(chunk => {\n  // Clean and format as markdown\n  return `## Content\\n\\n${chunk.trim()}`;\n}).join('\\n\\n');\n\nreturn {\n  json: {\n    ...item.json,\n    markdown: markdown,\n    status: 'processed'\n  }\n};"
-      },
-      "name": "Transform to Markdown",
-      "type": "n8n-nodes-base.function",
-      "typeVersion": 1,
-      "position": [
-        1450,
         200
       ]
     },
     {
       "parameters": {
-        "operation": "update",
+        "functionCode": "// Function to convert PDF text to markdown format with RAG optimizations\nconst text = items[0].json.document.content;\n\n// Basic RAG optimizations:\n// 1. Remove excessive whitespace\n// 2. Format headers (simple detection)\n// 3. Preserve paragraph breaks\n// 4. Add bullet points for lists (simple detection)\n\nlet markdown = text;\n\n// Remove excessive whitespace (more than 2 newlines)\nmarkdown = markdown.replace(/\\n{3,}/g, '\\n\\n');\n\n// Attempt to detect and format headers (simple approach)\nmarkdown = markdown.replace(/^([A-Z][A-Za-z\\s]{2,50})(?=\\n)/gm, '## $1');\n\n// Detect and format possible lists\nmarkdown = markdown.replace(/^(\\d+\\.\\s)/gm, '* ');\n\n// Split into chunks if too large (over 4000 tokens, roughly 16000 chars)\nconst MAX_CHUNK_SIZE = 16000;\nlet chunks = [];\n\nif (markdown.length > MAX_CHUNK_SIZE) {\n  // Split on paragraph breaks for cleaner divisions\n  const paragraphs = markdown.split(/\\n\\n/);\n  let currentChunk = '';\n  let chunkCount = 0;\n  \n  for (const paragraph of paragraphs) {\n    if (currentChunk.length + paragraph.length > MAX_CHUNK_SIZE) {\n      // Save current chunk\n      chunks.push({\n        ...items[0].json.document,\n        content: currentChunk.trim(),\n        markdown: currentChunk.trim(),\n        chunk_number: chunkCount,\n        total_chunks: Math.ceil(markdown.length / MAX_CHUNK_SIZE)\n      });\n      \n      chunkCount++;\n      currentChunk = paragraph + '\\n\\n';\n    } else {\n      currentChunk += paragraph + '\\n\\n';\n    }\n  }\n  \n  // Add the final chunk\n  if (currentChunk.trim().length > 0) {\n    chunks.push({\n      ...items[0].json.document,\n      content: currentChunk.trim(),\n      markdown: currentChunk.trim(),\n      chunk_number: chunkCount,\n      total_chunks: chunkCount + 1\n    });\n  }\n} else {\n  // Just one chunk needed\n  chunks.push({\n    ...items[0].json.document,\n    markdown: markdown.trim()\n  });\n}\n\nreturn chunks;"
+      },
+      "name": "Convert to Markdown",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        200
+      ]
+    },
+    {
+      "parameters": {
         "table": "documents",
         "schema": "public",
-        "where": "source_id = '{{ $json.fileId }}'",
-        "columns": {
-          "content": "={{ $json.markdown }}",
-          "status": "processed",
-          "updated_at": "={{ new Date().toISOString() }}"
-        },
-        "returnFields": "id, title, status"
+        "columns": "id, name, mime_type, created_time, web_view_link, content, markdown, chunk_number, total_chunks",
+        "additionalFields": {}
       },
-      "name": "Update Document with Content",
-      "type": "n8n-nodes-base.supabase",
+      "name": "Store in Supabase",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        1450,
+        200
+      ],
+      "credentials": {
+        "postgres": "supabase_db_credentials"
+      }
+    },
+    {
+      "parameters": {
+        "content": "={{ $json.markdown }}",
+        "options": {}
+      },
+      "name": "Embedding Provider",
+      "type": "n8n-nodes-base.switch",
       "typeVersion": 1,
       "position": [
         1650,
         200
       ],
-      "credentials": {
-        "supabaseApi": {
-          "id": "supabase-credentials",
-          "name": "Supabase API"
-        }
+      "switchOptions": {
+        "mode": "variable",
+        "variableName": "{{ $vars.EMBEDDING_PROVIDER }}"
       }
-    },
-    {
-      "parameters": {
-        "mode": "expression",
-        "outputMode": "input",
-        "expressionInput": "={{ $vars.EMBEDDING_PROVIDER || 'google' }}"
-      },
-      "name": "Choose Embedding Provider",
-      "type": "n8n-nodes-base.switch",
-      "typeVersion": 1,
-      "position": [
-        1850,
-        200
-      ]
     },
     {
       "parameters": {
@@ -198,161 +166,102 @@
                 "value": "Bearer {{ $vars.GOOGLE_AI_API_KEY }}"
               }
             ]
-          },
-          "response": {
-            "responseFormat": "json"
           }
         }
       },
-      "name": "Generate Google Embeddings",
+      "name": "Google Vertex AI Embeddings",
       "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 1,
+      "typeVersion": 4.1,
       "position": [
-        2050,
-        100
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Process the Google embedding response\nconst item = $input.item;\nconst embeddingResponse = item.json;\n\nif (embeddingResponse && embeddingResponse.predictions && embeddingResponse.predictions[0] && embeddingResponse.predictions[0].embeddings && embeddingResponse.predictions[0].embeddings.values) {\n  return {\n    json: {\n      ...item.json,\n      embedding: embeddingResponse.predictions[0].embeddings.values,\n      status: 'embedded',\n      embedding_provider: 'google',\n      vector_dimensions: embeddingResponse.predictions[0].embeddings.values.length\n    }\n  };\n} else {\n  throw new Error('Failed to generate Google embeddings');\n}"
-      },
-      "name": "Extract Google Embedding",
-      "type": "n8n-nodes-base.function",
-      "typeVersion": 1,
-      "position": [
-        2250,
-        100
-      ]
+        1850,
+        120
+      ],
+      "conditions": {
+        "value": [
+          {
+            "value1": "={{ $vars.EMBEDDING_PROVIDER }}",
+            "value2": "google"
+          }
+        ]
+      }
     },
     {
       "parameters": {
         "authentication": "headerAuth",
         "requestMethod": "POST",
-        "url": "https://api.anthropic.com/v1/embeddings",
+        "url": "https://api.voyageai.com/v1/embeddings",
         "options": {
           "bodyContentType": "json",
           "bodyParameters": {
             "parameters": [
               {
                 "name": "model",
-                "value": "claude-3-haiku-20240307"
+                "value": "voyage-3-large"
               },
               {
                 "name": "input",
                 "value": "={{ $json.markdown }}"
               },
               {
-                "name": "encoding_format",
-                "value": "float"
+                "name": "input_type",
+                "value": "document"
               }
             ]
           },
           "headers": {
             "parameters": [
               {
-                "name": "anthropic-version",
-                "value": "2023-06-01"
-              },
-              {
-                "name": "x-api-key",
-                "value": "{{ $vars.ANTHROPIC_API_KEY }}"
+                "name": "Authorization",
+                "value": "Bearer {{ $vars.VOYAGE_AI_API_KEY }}"
               }
             ]
-          },
-          "response": {
-            "responseFormat": "json"
           }
         }
       },
-      "name": "Generate Anthropic Embeddings",
+      "name": "Voyage AI Embeddings",
       "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 1,
+      "typeVersion": 4.1,
       "position": [
-        2050,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Process the Anthropic embedding response\nconst item = $input.item;\nconst embeddingResponse = item.json;\n\nif (embeddingResponse && embeddingResponse.embeddings && embeddingResponse.embeddings[0] && embeddingResponse.embeddings[0].embedding) {\n  return {\n    json: {\n      ...item.json,\n      embedding: embeddingResponse.embeddings[0].embedding,\n      status: 'embedded',\n      embedding_provider: 'anthropic',\n      vector_dimensions: embeddingResponse.embeddings[0].embedding.length\n    }\n  };\n} else {\n  throw new Error('Failed to generate Anthropic embeddings');\n}"
-      },
-      "name": "Extract Anthropic Embedding",
-      "type": "n8n-nodes-base.function",
-      "typeVersion": 1,
-      "position": [
-        2250,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "update",
-        "table": "documents",
-        "schema": "public",
-        "where": "source_id = '{{ $json.fileId }}'",
-        "columns": {
-          "embedding": "={{ $json.embedding }}",
-          "status": "embedded",
-          "embedding_provider": "={{ $json.embedding_provider }}",
-          "vector_dimensions": "={{ $json.vector_dimensions }}",
-          "updated_at": "={{ new Date().toISOString() }}"
-        },
-        "returnFields": "id, title, status, embedding_provider, vector_dimensions"
-      },
-      "name": "Save Embedding to Supabase",
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        2450,
-        200
+        1850,
+        280
       ],
-      "credentials": {
-        "supabaseApi": {
-          "id": "supabase-credentials",
-          "name": "Supabase API"
-        }
+      "conditions": {
+        "value": [
+          {
+            "value1": "={{ $vars.EMBEDDING_PROVIDER }}",
+            "value2": "voyage"
+          }
+        ]
       }
     },
     {
       "parameters": {
-        "jsCode": "// Prepare notification about non-PDF document\nconst item = $input.item;\nreturn {\n  json: {\n    fileName: item.json.name,\n    fileId: item.json.id,\n    mimeType: item.json.mimeType,\n    message: 'Skipped processing: Not a PDF document',\n    status: 'skipped'\n  }\n};"
+        "functionCode": "// Process embeddings from Vertex AI\nif (items[0].json.predictions) {\n  // Google Vertex AI embeddings\n  const embeddings = items[0].json.predictions[0].embeddings.values;\n  \n  return [{\n    json: {\n      ...items[0].json,\n      embedding: embeddings,\n      provider: 'google'\n    }\n  }];\n} else if (items[0].json.data && items[0].json.data.embeddings) {\n  // Voyage AI embeddings\n  const embeddings = items[0].json.data.embeddings[0];\n  \n  return [{\n    json: {\n      ...items[0].json,\n      embedding: embeddings,\n      provider: 'voyage'\n    }\n  }];\n} else {\n  // Error case\n  throw new Error('Unknown embedding format');\n}"
       },
-      "name": "Handle Non-PDF",
+      "name": "Process Embeddings",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
       "position": [
-        650,
-        400
+        2050,
+        200
       ]
     },
     {
       "parameters": {
-        "operation": "insert",
-        "table": "documents",
+        "table": "document_embeddings",
         "schema": "public",
-        "columns": {
-          "title": "={{ $json.fileName }}",
-          "source_id": "={{ $json.fileId }}",
-          "source_type": "google_drive",
-          "mime_type": "={{ $json.mimeType }}",
-          "status": "skipped",
-          "metadata": "={{ JSON.stringify($json) }}",
-          "created_at": "={{ new Date().toISOString() }}"
-        },
-        "returnFields": "id, title, source_id, status"
+        "columns": "document_id, embedding, provider, created_at",
+        "additionalFields": {}
       },
-      "name": "Record Skipped Document",
-      "type": "n8n-nodes-base.supabase",
+      "name": "Store Embedding in Supabase",
+      "type": "n8n-nodes-base.postgres",
       "typeVersion": 1,
       "position": [
-        850,
-        400
+        2250,
+        200
       ],
       "credentials": {
-        "supabaseApi": {
-          "id": "supabase-credentials",
-          "name": "Supabase API"
-        }
+        "postgres": "supabase_db_credentials"
       }
     }
   ],
@@ -361,25 +270,18 @@
       "main": [
         [
           {
-            "node": "Is PDF Document?",
+            "node": "Is PDF?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Is PDF Document?": {
+    "Is PDF?": {
       "main": [
         [
           {
             "node": "Download PDF",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Handle Non-PDF",
             "type": "main",
             "index": 0
           }
@@ -390,135 +292,102 @@
       "main": [
         [
           {
-            "node": "Prepare PDF Metadata",
+            "node": "PDF to Text",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Prepare PDF Metadata": {
+    "PDF to Text": {
       "main": [
         [
           {
-            "node": "Insert PDF Document",
+            "node": "Process PDF",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Insert PDF Document": {
+    "Process PDF": {
       "main": [
         [
           {
-            "node": "Extract Text from PDF",
+            "node": "Convert to Markdown",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Extract Text from PDF": {
+    "Convert to Markdown": {
       "main": [
         [
           {
-            "node": "Transform to Markdown",
+            "node": "Store in Supabase",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Transform to Markdown": {
+    "Store in Supabase": {
       "main": [
         [
           {
-            "node": "Update Document with Content",
+            "node": "Embedding Provider",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Update Document with Content": {
+    "Embedding Provider": {
       "main": [
         [
           {
-            "node": "Choose Embedding Provider",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Choose Embedding Provider": {
-      "main": [
-        [
-          {
-            "node": "Generate Google Embeddings",
+            "node": "Google Vertex AI Embeddings",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Generate Anthropic Embeddings",
+            "node": "Voyage AI Embeddings",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Generate Google Embeddings": {
+    "Google Vertex AI Embeddings": {
       "main": [
         [
           {
-            "node": "Extract Google Embedding",
+            "node": "Process Embeddings",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Extract Google Embedding": {
+    "Voyage AI Embeddings": {
       "main": [
         [
           {
-            "node": "Save Embedding to Supabase",
+            "node": "Process Embeddings",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Generate Anthropic Embeddings": {
+    "Process Embeddings": {
       "main": [
         [
           {
-            "node": "Extract Anthropic Embedding",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Extract Anthropic Embedding": {
-      "main": [
-        [
-          {
-            "node": "Save Embedding to Supabase",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Handle Non-PDF": {
-      "main": [
-        [
-          {
-            "node": "Record Skipped Document",
+            "node": "Store Embedding in Supabase",
             "type": "main",
             "index": 0
           }
@@ -526,22 +395,13 @@
       ]
     }
   },
-  "active": true,
-  "settings": {
-    "saveManualExecutions": true,
-    "callerPolicy": "workflowsFromSameOwner",
-    "saveExecutionProgress": true,
-    "saveDataErrorExecution": "all"
-  },
   "pinData": {},
-  "tags": [
-    "document-processing",
-    "google-drive",
-    "embeddings"
-  ],
+  "settings": {
+    "executionOrder": "v1"
+  },
   "staticData": null,
-  "versionId": "1",
-  "meta": {
-    "instanceId": "document-workflow-instance"
-  }
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2023-10-27T11:21:35.974Z",
+  "versionId": "abcde12345"
 } 

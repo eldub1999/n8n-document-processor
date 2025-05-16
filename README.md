@@ -17,45 +17,90 @@ This project implements an automated workflow for:
 - **Trigger**: Google Drive folder monitoring
 - **Storage**: Supabase database for document metadata, content, and vectors
 - **Processing**: Document conversion and optimization for RAG
-- **Vectorization**: Google Vertex AI or Anthropic embedding generation with vector storage in Supabase
+- **Vectorization**: Google Vertex AI or Voyage AI embedding generation with vector storage in Supabase
 
 ### MVP2: Query Interface
-- **Interface**: n8n chat trigger
-- **Query Processing**: Context retrieval and AI response generation
-- **Response Delivery**: Formatted responses through chat interface
+- **Vector Search**: Similarity search using pgvector in Supabase
+- **Chat Interface**: Built with an n8n webhook endpoint
+- **Response Generation**: Using retrieved content with a provided chat prompt
 
-### Beta 1: Webhook Integration
-- **Trigger**: Supabase webhook for document uploads
-- **Integration**: Web application connection points
+### Beta 1: Web Application Integration
+- **HTTP Webhook**: To replace Google Drive trigger
+- **API Layer**: For direct integration with web applications
+- **Authentication**: For secure document processing requests
 
-## Setup Requirements
+## Implementation Details
 
-### Prerequisites
-- n8n.cloud account
-- Supabase account and project
-- Google Drive API credentials
-- Either Google Vertex AI or Anthropic API key for embeddings
+### Key Components
 
-### Installation
-1. Set up your n8n.cloud workspace
-2. Import the workflow JSON file:
-   - Use `workflows/n8n-document-processor.json` - a single workflow that supports both Google and Anthropic embeddings
-3. Configure credentials for Google Drive and Supabase
-4. Set up required environment variables, including `EMBEDDING_PROVIDER` set to either "google" or "anthropic"
-5. Create the necessary Supabase database tables
+1. **Document Ingestion**
+   - Google Drive trigger monitors folder for new documents
+   - n8n workflow extracts text and metadata
 
-For detailed setup instructions, see the [Import Guide](workflows/IMPORT_GUIDE.md).
+2. **Text Processing**
+   - Convert PDF documents to clean text
+   - Transform to markdown format with RAG optimizations
+   - Chunk documents if they exceed embedding token limits
 
-## Workflow Structure
+3. **Vector Generation**
+   - Choice of embedding providers:
+     - **Google Vertex AI**: text-embedding-gecko model 
+     - **Voyage AI**: voyage-3-large model
+   - Embedding dimension: 1024 (configurable)
 
-The document processing workflow consists of these key steps:
+4. **Storage**
+   - Supabase PostgreSQL database
+   - pgvector extension for vector operations
+   - Table structure for documents and embeddings
 
-1. **Detection**: Monitor Google Drive folder for new documents
-2. **Filtering**: Process only PDF files (configurable to add more types)
-3. **Extraction**: Download documents and extract text content
-4. **Processing**: Convert to RAG-optimized markdown format
-5. **Vectorization**: Generate embeddings using either Google Vertex AI or Anthropic API based on your configuration
-6. **Storage**: Store all metadata, content, and vectors in Supabase
+## Setup Instructions
+
+1. **n8n.cloud Setup**
+   - Create an n8n.cloud account
+   - Import workflow from JSON file
+   - Configure credentials and variables
+
+2. **Supabase Setup**
+   - Create a Supabase project
+   - Enable pgvector extension
+   - Create required database tables
+
+3. **Integration Setup**
+   - Connect Google Drive account
+   - Set up API keys for your chosen embedding provider
+
+Detailed setup instructions are available in the [Import Guide](workflows/IMPORT_GUIDE.md).
+
+## Usage
+
+1. **Document Processing**
+   - Add PDF documents to your configured Google Drive folder
+   - Workflow automatically processes and vectorizes content
+   - View processed documents in Supabase
+
+2. **Using Embeddings**
+   - Query Supabase using vector similarity search
+   - Use embeddings for semantic document search
+   - Integrate with AI systems for RAG
+
+## Project Structure
+
+- `/workflows/` - n8n workflow definitions
+  - `n8n-document-processor.json` - Main workflow file to import into n8n
+
+## Future Enhancements
+
+1. **Multiple File Types**
+   - Support for Word, Excel, PowerPoint, etc.
+   - Support for image-based documents with OCR
+
+2. **Advanced RAG Optimizations**
+   - Improved chunking strategies
+   - Metadata extraction and tagging
+
+3. **Webhook Interface**
+   - Direct document upload API
+   - Real-time processing status updates
 
 ## Development
 

@@ -9,7 +9,7 @@ Before importing the workflow, ensure you have:
 1. An active n8n.cloud account
 2. A Google account with access to Google Drive
 3. A Supabase project with the necessary tables set up
-4. Access to either Google AI (Vertex AI) or Anthropic API for generating embeddings
+4. Access to either Google Vertex AI or Voyage AI API for generating embeddings
 
 ## Import Steps
 
@@ -17,15 +17,16 @@ Before importing the workflow, ensure you have:
 2. Navigate to "Workflows" in the main menu
 3. Click on "Import from File" or "Import from URL" 
 4. Select the workflow file from this repository:
-   - `n8n-document-processor.json` (supports both Google and Anthropic embeddings)
+   - `n8n-document-processor.json` (supports both Google and Voyage AI embeddings)
 5. Click "Import" to add the workflow to your workspace
 
 ## Embedding Model Selection
 
-The combined workflow supports both embedding providers through a Switch node that checks the `EMBEDDING_PROVIDER` variable:
+The combined workflow supports two embedding providers:
+- **Google Vertex AI** - Uses the text-embedding-gecko model
+- **Voyage AI** - Uses the voyage-3-large model
 
-- Set `EMBEDDING_PROVIDER` to `"google"` to use Google Vertex AI embeddings (default if not specified)
-- Set `EMBEDDING_PROVIDER` to `"anthropic"` to use Anthropic embeddings
+The provider can be selected by setting the `EMBEDDING_PROVIDER` variable in n8n to either `google` or `voyage`.
 
 ## Required Credentials
 
@@ -33,69 +34,85 @@ The workflow requires the following credentials to be set up in n8n.cloud:
 
 ### Google Drive
 
-1. Go to "Settings" → "Credentials"
-2. Click "Create New" and select "Google Drive OAuth2 API"
-3. Follow the prompts to connect your Google account
+1. Go to "Settings" > "Credentials" in n8n
+2. Click "Create New Credentials"
+3. Select the "Google Drive OAuth2 API" credential type
+4. Follow the prompts to connect to your Google account
+5. Name the credentials "google_drive_credentials"
 
-### Supabase
+### Supabase Database
 
-1. Go to "Settings" → "Credentials"
-2. Click "Create New" and select "Supabase API"
-3. Enter your Supabase URL and API key
+1. Go to "Settings" > "Credentials" in n8n
+2. Click "Create New Credentials"
+3. Select the "Postgres" credential type
+4. Enter your Supabase connection details:
+   - Host: Your Supabase project hostname (e.g., `db.abcdefghijkl.supabase.co`)
+   - Database: `postgres`
+   - User: `postgres`
+   - Password: Your Supabase database password
+   - Port: `5432` (default)
+   - SSL: Enabled
+5. Name the credentials "supabase_db_credentials"
 
 ## Required Variables
 
-Set up the following variables in n8n.cloud under "Settings" → "Variables":
+Set up the following variables in n8n:
 
-| Variable Name | Description | Example | Required For |
-|---------------|-------------|---------|-------------|
-| GOOGLE_DRIVE_FOLDER_ID | ID of the Google Drive folder to monitor | 1aBcDeFgHiJkLmNoPqRsTuVwXyZ | All providers |
-| EMBEDDING_PROVIDER | Provider to use for embeddings ("google" or "anthropic") | google | Provider selection |
-| GOOGLE_AI_API_URL | Google Vertex AI API endpoint | https://us-central1-aiplatform.googleapis.com | Google embeddings |
-| GOOGLE_AI_API_KEY | Your Google AI API key | your-google-api-key | Google embeddings |
-| ANTHROPIC_API_KEY | Your Anthropic API key | sk-ant-xxxx | Anthropic embeddings |
+1. `GOOGLE_DRIVE_FOLDER_ID` - The ID of the Google Drive folder to monitor (from the folder URL)
+2. `EMBEDDING_PROVIDER` - Set to either `google` or `voyage` depending on which embedding service you want to use
+3. `GOOGLE_AI_API_URL` - Your Google Vertex AI API URL (typically `https://us-central1-aiplatform.googleapis.com`)
+4. `GOOGLE_AI_API_KEY` - Your Google API key (if using Google embeddings)
+5. `VOYAGE_AI_API_KEY` - Your Voyage AI API key (if using Voyage AI embeddings)
 
-## Supabase Database Setup
+## Required Database Tables
 
-The workflow expects a `documents` table in your Supabase database with the following schema:
+Create these tables in your Supabase project:
+
+### Documents Table
 
 ```sql
-create table documents (
-  id uuid primary key default uuid_generate_v4(),
-  title text not null,
-  source_id text not null,
-  source_type text not null,
-  mime_type text,
-  status text not null,
-  content text,
-  metadata jsonb,
-  embedding vector(1536),
-  embedding_provider text,
-  vector_dimensions integer,
-  created_at timestamp with time zone default now(),
-  updated_at timestamp with time zone
+CREATE TABLE public.documents (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL,
+    mime_type TEXT,
+    created_time TIMESTAMP WITH TIME ZONE,
+    web_view_link TEXT,
+    content TEXT,
+    markdown TEXT,
+    chunk_number INTEGER DEFAULT 0,
+    total_chunks INTEGER DEFAULT 1,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
--- Create index for vector similarity search
-create index on documents using ivfflat (embedding vector_cosine_ops);
 ```
 
-Note: The embedding dimension will be automatically detected and stored in the `vector_dimensions` column.
-Typical dimensions are:
-- Google text-embedding-gecko: 768 dimensions
-- Anthropic Claude: 1024 dimensions
+### Document Embeddings Table
 
-Ensure the pgvector extension is enabled in your Supabase project.
+```sql
+CREATE TABLE public.document_embeddings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    document_id UUID REFERENCES public.documents(id),
+    embedding VECTOR(1024),
+    provider TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    CONSTRAINT fk_document FOREIGN KEY (document_id) REFERENCES public.documents(id) ON DELETE CASCADE
+);
+```
+
+Make sure to enable the `vector` extension in your Supabase project:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
+```
 
 ## Testing the Workflow
 
-After importing and configuring:
+After configuring the workflow:
 
-1. Activate the workflow by toggling the "Active" switch
-2. Set the `EMBEDDING_PROVIDER` variable to your preferred provider ("google" or "anthropic")
-3. Add a PDF file to your monitored Google Drive folder
-4. Check the execution logs to verify each step is completing successfully
-5. Verify the document and its embedding are stored in your Supabase database
+1. Activate the workflow by toggling the "Active" switch in the top-right corner
+2. Add a PDF file to your configured Google Drive folder
+3. The workflow should detect the new file, process it, and store it in your Supabase database
+4. Check your Supabase database to see the document and its embedding
 
 ## Workflow Steps Overview
 
@@ -107,7 +124,7 @@ After importing and configuring:
 6. **Extract Text from PDF**: Extracts text content from the PDF
 7. **Transform to Markdown**: Converts the text to RAG-optimized markdown
 8. **Update Document with Content**: Saves the processed content to Supabase
-9. **Choose Embedding Provider**: Routes to Google or Anthropic based on the EMBEDDING_PROVIDER variable
+9. **Choose Embedding Provider**: Routes to Google or Voyage AI based on the EMBEDDING_PROVIDER variable
 10. **Generate Embeddings**: Creates vector embeddings using the selected provider
 11. **Extract Embedding Vector**: Processes the API response
 12. **Save Embedding to Supabase**: Stores the embedding vector in the database
@@ -119,4 +136,4 @@ After importing and configuring:
 - **Google Drive Connection Issues**: Ensure your OAuth credentials are valid
 - **Supabase Errors**: Verify your table schema matches the expected structure
 - **Embedding Generation Failures**: Check your API key and usage limits for your chosen provider
-- **Switch Node Issues**: Verify the `EMBEDDING_PROVIDER` variable is set correctly ("google" or "anthropic") 
+- **Switch Node Issues**: Verify the `EMBEDDING_PROVIDER` variable is set correctly ("google" or "voyage") 

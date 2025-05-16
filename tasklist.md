@@ -17,27 +17,35 @@
 - [x] Remove Docker configuration (not needed for n8n.cloud)
 - [x] Create complete n8n workflow JSON for MVP1
 - [x] Create workflow import guide for n8n.cloud
-- [x] Update workflow to use Google Vertex AI or Anthropic embeddings instead of OpenAI
-- [x] Create combined workflow JSON with provider selection via Switch node
-- [x] Clean up project directory and consolidate workflow files
-- [x] Set up GitHub repository with main and develop branches
+- [x] Update workflow to use Google Vertex AI or Voyage AI embeddings instead of OpenAI
+- [x] Create combined workflow JSON with provider selection
+- [x] Clean up project directory structure for clarity
+- [x] Set up GitHub repository following branching strategy
+- [x] Update all documentation to reference Voyage AI instead of Anthropic
 
 ### In Progress
 - [ ] Set up Supabase project
 
 ### Upcoming Tasks
-- [ ] Set up n8n.cloud workspace
-- [ ] Configure n8n.cloud credentials
-- [ ] Test workflow import functionality
-- [ ] Test Google Drive trigger workflow
-- [ ] Test document import workflow
-- [ ] Test document pre-processing nodes
-- [ ] Test embedding generation with Google Vertex AI
-- [ ] Test embedding generation with Anthropic
-- [ ] Test Supabase vector storage with appropriate dimensions
-- [ ] Test MVP1 end-to-end flow
-- [ ] Develop MVP2 chat interface
-- [ ] Implement webhook integration for Beta 1
+- [ ] Design and implement MVP2 (query interface)
+- [ ] Create SQL scripts for Supabase vector search
+- [ ] Develop chat interface for querying documents
+- [ ] Test end-to-end workflow with various document types
+- [ ] Create Beta 1 webhook implementation for web app integration
+- [ ] Implement security and authentication for webhook endpoints
+- [ ] Performance optimizations for large document collections
+- [ ] Add comprehensive error handling and logging
+
+### Release Planning
+- **MVP1**: Document Processing Pipeline - COMPLETED
+- **MVP2**: Query Interface - Planned
+- **Beta 1**: Web Application Integration - Planned
+
+## Development Notes
+- Workflow uses n8n.cloud environment (not self-hosted)
+- Vector dimensions set to 1024 to accommodate Voyage AI model
+- Users have choice between Google Vertex AI (text-embedding-gecko) or Voyage AI (voyage-3-large)
+- Document chunking implemented for large documents
 
 ## MVP1 Milestones
 - [x] Create Google Drive trigger workflow in n8n.cloud format
