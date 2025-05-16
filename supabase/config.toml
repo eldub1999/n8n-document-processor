@@ -321,7 +321,3 @@ verify_jwt = false
 
 [functions.bypass-auth]
 verify_jwt = false
-
-# Global function settings
-[functions_config]
-timeout_seconds = 60
