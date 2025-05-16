@@ -69,6 +69,8 @@
 - [x] Implement document metadata extraction function
 - [x] Create document validation and sanitization function
 - [x] Implement user authorization checks with JWT authentication
+- [x] Create test script for edge function authentication
+- [x] Develop action plan for edge function JWT authentication issues
 - [ ] Build document search function with full-text search
 - [ ] Extend document-validation function to detect duplicates
 - [ ] Create document-versioning edge function for version management
@@ -92,6 +94,8 @@
 
 ## Testing
 - [x] Test authentication flows
+- [x] Create test scripts for edge function validation
+- [x] Identify authentication issues with edge functions
 - [ ] Verify document upload/download functionality
 - [ ] Test edge functions
 - [ ] Validate security policies
