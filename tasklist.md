@@ -11,14 +11,14 @@
 - [x] Configure storage bucket for documents
 - [x] Create database schema for document metadata
 - [x] Set up Row Level Security (RLS) policies
-- [ ] Configure authentication settings
-- [ ] Create and deploy Supabase Edge Functions for document processing
+- [x] Configure authentication settings
+- [x] Create and deploy Supabase Edge Functions for document processing
 
 ## Frontend Implementation
 - [x] Create application layout and navigation
 - [x] Implement authentication components (sign in, sign up, password reset)
-- [ ] Build document upload component with drag-and-drop support
-- [ ] Develop document listing component with sorting and filtering
+- [x] Build document upload component with drag-and-drop support
+- [x] Develop document listing component with sorting and filtering
 - [ ] Implement document preview functionality (if possible based on file type)
 - [x] Create placeholder document details view
 - [x] Create placeholder upload page
@@ -47,19 +47,19 @@
 - [x] Create missing placeholder components to fix import errors
 
 ## Edge Functions
-- [ ] Implement document metadata extraction function
-- [ ] Create document validation and sanitization function
+- [x] Implement document metadata extraction function
+- [x] Create document validation and sanitization function
 - [ ] Build document search function with full-text search
 - [ ] Implement user authorization checks
 
 ## Security & Performance
 - [ ] Set up proper CORS configurations
-- [ ] Implement client-side file validation
+- [x] Implement client-side file validation
 - [ ] Configure rate limiting for uploads
 - [ ] Optimize file uploads for large documents
 
 ## Testing
-- [ ] Test authentication flows
+- [x] Test authentication flows
 - [ ] Verify document upload/download functionality
 - [ ] Test edge functions
 - [ ] Validate security policies
