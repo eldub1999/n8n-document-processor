@@ -5,19 +5,21 @@
 - [x] Set up React frontend project with Vite
 - [x] Install necessary dependencies (Supabase client, React Router, UI framework)
 - [x] Configure environment variables
+- [x] Correctly set up Chakra UI v3 theming system
 
 ## Supabase Setup
 - [x] Create Supabase project
 - [x] Configure storage bucket for documents
 - [x] Create database schema for document metadata
 - [x] Set up Row Level Security (RLS) policies
-- [ ] Configure authentication settings
+- [x] Configure authentication settings (disabled email verification)
 - [ ] Create and deploy Supabase Edge Functions for document processing
 
 ## Frontend Implementation
 - [x] Create application layout and navigation
-- [ ] Implement authentication components (sign in, sign up, password reset)
-- [ ] Build document upload component with drag-and-drop support
+- [x] Update theme and layout components to properly use Chakra UI v3
+- [x] Implement authentication components (sign in, sign up, password reset)
+- [x] Build document upload component with drag-and-drop support
 - [ ] Develop document listing component with sorting and filtering
 - [ ] Implement document preview functionality (if possible based on file type)
 - [ ] Create document details view
