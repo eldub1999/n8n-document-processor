@@ -7,7 +7,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<{email?: string, password?: string}>({});
+  const [errors, setErrors] = useState<{email?: string, password?: string, auth?: string}>({});
   
   const navigate = useNavigate();
   
@@ -25,14 +25,32 @@ export default function LoginPage() {
     if (!validateForm()) return;
     
     setIsLoading(true);
+    console.log('Attempting login with:', { email }); // Don't log password
     
     try {
-      await signInWithEmail(email, password);
-      navigate('/documents');
+      console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
+      console.log('Supabase Anon Key exists:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
+      
+      const response = await signInWithEmail(email, password);
+      console.log('Login response:', response);
+      
+      if (response.session) {
+        console.log('Login successful, navigating to /documents');
+        navigate('/documents');
+      } else {
+        console.error('No session returned after login');
+        setErrors({ auth: 'Authentication failed - no session returned' });
+      }
     } catch (error) {
+      console.error('Login error:', error);
       toaster.create({
         title: 'Error signing in',
         description: error instanceof Error ? error.message : 'Unknown error occurred',
+      });
+      setErrors({ 
+        auth: error instanceof Error 
+          ? error.message
+          : 'Unknown authentication error' 
       });
     } finally {
       setIsLoading(false);
@@ -70,6 +88,12 @@ export default function LoginPage() {
             />
             {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
           </div>
+          
+          {errors.auth && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+              <p className="text-sm text-red-600">{errors.auth}</p>
+            </div>
+          )}
           
           <button 
             type="submit" 
