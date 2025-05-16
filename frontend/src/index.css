@@ -5,7 +5,7 @@
 /* Custom styles */
 @layer base {
   body {
-    @apply bg-gray-50 text-gray-900;
+    @apply bg-zinc-50 text-zinc-900;
   }
 }
 
@@ -19,6 +19,6 @@
   }
   
   .btn-outline {
-    @apply border border-gray-300 hover:bg-gray-100;
+    @apply border border-zinc-300 hover:bg-zinc-100;
   }
 }
