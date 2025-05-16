@@ -5,16 +5,13 @@ import {
   Input,
   Flex,
   Text,
-  VStack,
-  FormControl,
-  FormLabel,
-  FormErrorMessage,
   Link,
-  useToast
+  Field
 } from '@chakra-ui/react';
 import { useState } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { signUpWithEmail } from '../services/authService';
+import { toaster } from '../services/toast';
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
@@ -28,7 +25,6 @@ export default function RegisterPage() {
   }>({});
   
   const navigate = useNavigate();
-  const toast = useToast();
   
   const validateForm = () => {
     const newErrors: {
@@ -60,21 +56,15 @@ export default function RegisterPage() {
     
     try {
       await signUpWithEmail(email, password);
-      toast({
+      toaster.create({
         title: 'Account created',
-        description: 'Check your email to confirm your account',
-        status: 'success',
-        duration: 5000,
-        isClosable: true,
+        description: 'You can now sign in with your credentials',
       });
       navigate('/login');
     } catch (error) {
-      toast({
+      toaster.create({
         title: 'Error creating account',
         description: error instanceof Error ? error.message : 'Unknown error occurred',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
       });
     } finally {
       setIsLoading(false);
@@ -83,63 +73,76 @@ export default function RegisterPage() {
   
   return (
     <Flex minH="70vh" align="center" justify="center">
-      <Box w="100%" maxW="400px" p={8} borderWidth="1px" borderRadius="lg" boxShadow="lg">
-        <Heading as="h1" size="xl" textAlign="center" mb={6}>
+      <Box 
+        w="100%" 
+        maxW="400px" 
+        p={8} 
+        borderWidth="1px" 
+        borderColor="gray.200"
+        borderRadius="lg" 
+        bg="bg.DEFAULT"
+        boxShadow="md"
+      >
+        <Heading as="h1" size="xl" textAlign="center" mb={6} color="fg.DEFAULT">
           Create Account
         </Heading>
         
         <form onSubmit={handleSubmit}>
-          <VStack spacing={4}>
-            <FormControl isInvalid={!!errors.email}>
-              <FormLabel>Email</FormLabel>
+          <Flex direction="column" gap={4}>
+            <Field.Root invalid={!!errors.email}>
+              <Field.Label>Email</Field.Label>
               <Input 
                 type="email" 
                 value={email} 
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your@email.com"
               />
-              <FormErrorMessage>{errors.email}</FormErrorMessage>
-            </FormControl>
+              {errors.email && <Field.ErrorText>{errors.email}</Field.ErrorText>}
+            </Field.Root>
             
-            <FormControl isInvalid={!!errors.password}>
-              <FormLabel>Password</FormLabel>
+            <Field.Root invalid={!!errors.password}>
+              <Field.Label>Password</Field.Label>
               <Input 
                 type="password" 
                 value={password} 
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="At least 6 characters"
               />
-              <FormErrorMessage>{errors.password}</FormErrorMessage>
-            </FormControl>
+              {errors.password && <Field.ErrorText>{errors.password}</Field.ErrorText>}
+            </Field.Root>
             
-            <FormControl isInvalid={!!errors.confirmPassword}>
-              <FormLabel>Confirm Password</FormLabel>
+            <Field.Root invalid={!!errors.confirmPassword}>
+              <Field.Label>Confirm Password</Field.Label>
               <Input 
                 type="password" 
                 value={confirmPassword} 
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Repeat your password"
               />
-              <FormErrorMessage>{errors.confirmPassword}</FormErrorMessage>
-            </FormControl>
+              {errors.confirmPassword && <Field.ErrorText>{errors.confirmPassword}</Field.ErrorText>}
+            </Field.Root>
             
             <Button 
               type="submit" 
-              colorScheme="blue" 
               width="full" 
               mt={4}
-              isLoading={isLoading}
+              loading={isLoading}
+              bg="accent.DEFAULT"
+              color="white"
+              _hover={{ bg: "accent.emphasis" }}
             >
               Sign Up
             </Button>
-          </VStack>
+          </Flex>
         </form>
         
         <Text mt={4} textAlign="center">
           Already have an account?{' '}
-          <Link as={RouterLink} to="/login" color="blue.500">
-            Sign in here
-          </Link>
+          <RouterLink to="/login">
+            <Link color="accent.DEFAULT">
+              Sign in here
+            </Link>
+          </RouterLink>
         </Text>
       </Box>
     </Flex>
