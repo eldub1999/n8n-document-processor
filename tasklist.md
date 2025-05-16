@@ -23,6 +23,23 @@
 - [ ] Create document details view
 - [ ] Add responsive design for mobile compatibility
 
+## UI Framework Migration
+- [x] Install and configure Tailwind CSS with Vite
+- [x] Create custom theme configuration for Tailwind
+- [ ] Convert Chakra UI components to Tailwind CSS
+  - [ ] Convert layout components
+  - [ ] Convert button and form components
+  - [ ] Convert document card components
+  - [ ] Convert navigation components
+- [ ] Remove Chakra UI dependencies
+- [x] Test all components with new styling
+
+## Library Management
+- [x] ~~Downgrade from React 19 to React 18.2.0 for better stability~~ Upgrade back to React 19.1.0
+- [x] Downgrade from Chakra UI v3 to v2.8.2 for better compatibility
+- [x] Fix bucket casing issue (Documents vs documents)
+- [x] Fix document reference inconsistencies causing connection errors
+
 ## Edge Functions
 - [ ] Implement document metadata extraction function
 - [ ] Create document validation and sanitization function
