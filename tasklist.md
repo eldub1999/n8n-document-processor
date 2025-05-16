@@ -27,16 +27,22 @@
 
 ## Document Management Features
 - [ ] Implement document deduplication
-  - [ ] Create hash-based or content-based document identification method
+  - [ ] Create hash-based document identification method
   - [ ] Add duplicate detection during upload process
-  - [ ] Implement user notification for duplicate documents
-  - [ ] Update UI to handle duplicate document scenarios
+  - [ ] Implement error notification for duplicate documents
+  - [ ] Block all duplicate uploads without exceptions
 - [ ] Implement document versioning and archiving
   - [ ] Extend database schema to support document versions
   - [ ] Create storage structure for archived documents
-  - [ ] Implement document replacement functionality in UI
+  - [ ] Implement document update button in document list
   - [ ] Add version history view to document details
   - [ ] Configure 5-year retention policy for archived versions
+- [ ] Implement metadata tagging system
+  - [ ] Add jurisdiction (state/territory/national) dropdown field
+  - [ ] Add dynamic county selection based on jurisdiction
+  - [ ] Add document type categorization field
+  - [ ] Implement filtering based on metadata tags
+  - [ ] Update UI to incorporate metadata in document list
 
 ## UI Framework Migration
 - [x] Install and configure Tailwind CSS with Vite
@@ -67,11 +73,19 @@
 - [ ] Extend document-validation function to detect duplicates
 - [ ] Create document-versioning edge function for version management
 
+## Database Schema Updates
+- [ ] Add content_hash field to documents table
+- [ ] Add version and is_latest fields to documents table
+- [ ] Add jurisdiction, county, and document_type fields to documents table
+- [ ] Create document_versions table with appropriate fields
+- [ ] Implement database triggers for versioning automation
+
 ## Security & Performance
 - [ ] Set up proper CORS configurations
 - [x] Implement client-side file validation
 - [ ] Configure rate limiting for uploads
 - [ ] Optimize file uploads for large documents
+- [ ] Implement access control roles for document management (future)
 
 ## Testing
 - [x] Test authentication flows
@@ -81,6 +95,7 @@
 - [ ] Performance testing for large files
 - [ ] Test document deduplication functionality
 - [ ] Test document versioning and archived access
+- [ ] Test metadata filtering capabilities
 
 ## Documentation
 - [x] Update approach document with UI migration strategy
@@ -89,6 +104,7 @@
 - [ ] Document API endpoints
 - [ ] Create user guide for application features
 - [ ] Document deduplication and versioning architecture
+- [ ] Document metadata tagging system and filtering capabilities
 
 ## Deployment
 - [ ] Deploy React frontend

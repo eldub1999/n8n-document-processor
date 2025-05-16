@@ -60,6 +60,9 @@ This document outlines the technology stack used in our Document Management Appl
   - `content_hash`: Hash of file content for deduplication
   - `version`: Current version number
   - `is_latest`: Boolean flag for latest version
+  - `jurisdiction`: State/territory or "National"
+  - `county`: County name (if applicable)
+  - `document_type`: Document category (Real Estate Law, etc.)
 
 - **document_versions**: Table for tracking document version history:
   - `id`: UUID primary key
@@ -87,14 +90,27 @@ This document outlines the technology stack used in our Document Management Appl
 
 - **Content Hashing**: SHA-256 for generating unique document fingerprints
 - **Duplicate Detection**: Server-side comparison of file hashes
-- **Conflict Resolution**: UI components for handling duplicate uploads
+- **Strict Validation**: No duplicates permitted under any circumstances
+- **Error Handling**: Clear user feedback for duplicate upload attempts
 
 ### Versioning & Archiving
 
 - **Version Control**: System for tracking document revisions
+- **Update Interface**: Document-specific update functionality
 - **Archiving Strategy**: Automated storage of previous versions
 - **Retention Policy**: 5-year retention period with automated cleanup
 - **Version Access**: UI components for accessing document history
+
+### Metadata Tagging System
+
+- **Jurisdiction Tag**: Dropdown component with all US states/territories and "National"
+- **County Tag**: Dynamic dropdown with counties based on selected state
+- **Document Type Tag**: Categorization system for legal documents:
+  - Real Estate Law
+  - Title and Escrow Law
+  - Tax Law
+  - Regulation
+- **Search & Filter**: Advanced filtering capabilities using metadata tags
 
 ## Development & Deployment
 
@@ -132,7 +148,7 @@ The application has successfully completed the UI framework migration:
 
 ## Future Enhancements
 
-- **Edge Functions**: For document processing and advanced search capabilities
+- **Access Control Roles**: Role-based permissions for document management
 - **Full-text Search**: For document content indexing
-- **Version Control**: For tracking document versions and changes
+- **Advanced Filtering**: Enhanced metadata-based search capabilities
 - **Collaboration Features**: For document sharing and collaborative editing 

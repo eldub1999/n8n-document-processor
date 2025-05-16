@@ -41,23 +41,32 @@ This approach provides better performance and scalability compared to storing fi
 To ensure each document in the system is unique:
 - We'll implement a hash-based deduplication system using file content hashing
 - During upload, the document hash will be calculated and compared against existing documents
-- If a duplicate is detected, users will be notified and given options to:
-  - Skip the upload (default)
-  - Replace the existing document with a new version (see versioning)
-  - Rename and upload as a distinct document
-- This approach prevents redundant storage while maintaining user flexibility
+- If a duplicate is detected, users will be notified with an error message
+- Duplicates are strictly forbidden under any circumstances
+- This approach ensures knowledge integrity for the RAG-based AI system
 
 ### Document Versioning and Archiving
 
 To support document updates while preserving history:
-- A versioning system will track document changes over time
-- When a document is replaced, the previous version will be:
+- Users must first locate the existing document in the document list
+- An "Update" button will be available for each document
+- When a document is updated, the previous version will be:
   - Moved to an archive storage location
   - Linked to the current version through a version chain
   - Retained for a 5-year period per policy requirements
 - Users can access version history to view or restore previous versions
 - Metadata will track version numbers, creation dates, and modification details
-- This approach balances storage optimization with historical record preservation
+- This approach maintains historical records of legal document changes
+
+### Metadata Tagging System
+
+To facilitate document organization and filtering:
+- Three primary metadata tags will be implemented:
+  1. **Jurisdiction Tag**: Dropdown with all US states/territories and a "National" option
+  2. **County Tag**: Dropdown with counties for the selected state (disabled for "National")
+  3. **Document Type Tag**: Categorizes documents as Real Estate Law, Title and Escrow Law, Tax Law, or Regulation
+- These tags will support the RAG implementation by providing structured filtering capabilities
+- Additional metadata fields may be implemented in the future based on user needs
 
 ### Database Schema
 
@@ -74,6 +83,9 @@ We'll create a `documents` table with the following structure:
 - `content_hash`: Hash of the document content for deduplication
 - `version`: Current version number of the document
 - `is_latest`: Boolean flag indicating if this is the latest version
+- `jurisdiction`: State/territory or "National"
+- `county`: County name (if applicable)
+- `document_type`: Category of document (Real Estate Law, etc.)
 
 A complementary `document_versions` table will track version history:
 - `id`: UUID primary key
@@ -91,7 +103,9 @@ This schema allows us to efficiently query documents, while maintaining a clean 
 We'll implement a security model using Supabase Row Level Security (RLS) policies:
 1. **Public Documents**: All authenticated users can view documents
 2. **Private User Documents**: Users can only manage (update/delete) documents they've created
-3. **Admin Access**: Admin users can manage all documents (future enhancement)
+3. **Admin Access**: Admin users can manage all documents
+
+A future implementation will include more granular access control roles for document management.
 
 ### Edge Functions Strategy
 
@@ -111,14 +125,14 @@ Using Edge Functions allows us to keep sensitive business logic on the server wh
    - Support for drag-and-drop uploads
    - Progress indicators for large files
    - Client-side validation before upload
-   - Duplicate detection and user notifications
+   - Duplicate detection and error notifications
 
 2. **Document Management**:
-   - Intuitive list view with sorting and filtering
+   - Intuitive list view with sorting and filtering based on metadata tags
    - Preview functionality for common file types
    - Batch operations for efficiency
    - Version history access and management
-   - Options to replace existing documents with new versions
+   - Update button for creating new versions of existing documents
 
 3. **Responsive Design**:
    - Mobile-friendly interface
@@ -150,7 +164,8 @@ The migration strategy involves:
 
 ## Future Enhancements
 
-1. **Version Control**: Track document versions and changes
+1. **Access Control Roles**: Implement role-based access control for document management
 2. **Collaboration**: Allow sharing and collaborative editing
 3. **Advanced Search**: Full-text search across document content
-4. **Integration**: Connect with third-party services like Google Drive or Dropbox
+4. **Integration**: Connect with third-party services for document sourcing
+5. **Advanced Metadata**: Expand metadata tagging system as needs evolve
