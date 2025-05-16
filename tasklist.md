@@ -19,22 +19,18 @@
 - [x] Create workflow import guide for n8n.cloud
 - [x] Update workflow to use Google Vertex AI or Voyage AI embeddings instead of OpenAI
 - [x] Create combined workflow JSON with provider selection
-- [x] Clean up project directory structure for clarity
-- [x] Set up GitHub repository following branching strategy
-- [x] Update all documentation to reference Voyage AI instead of Anthropic
+- [x] Clean up project structure and consolidate workflow files
+- [x] Set up GitHub repository and initialize branches
+- [x] Set up Supabase project with required tables and extensions
 
 ### In Progress
-- [ ] Set up Supabase project
+- [ ] Test workflow execution 
 
 ### Upcoming Tasks
-- [ ] Design and implement MVP2 (query interface)
-- [ ] Create SQL scripts for Supabase vector search
-- [ ] Develop chat interface for querying documents
-- [ ] Test end-to-end workflow with various document types
-- [ ] Create Beta 1 webhook implementation for web app integration
-- [ ] Implement security and authentication for webhook endpoints
-- [ ] Performance optimizations for large document collections
-- [ ] Add comprehensive error handling and logging
+- [ ] Implement MVP2 with chat interface
+- [ ] Add webhook support for Beta 1
+- [ ] Create detailed user guide
+- [ ] Add monitoring and alerts
 
 ### Release Planning
 - **MVP1**: Document Processing Pipeline - COMPLETED

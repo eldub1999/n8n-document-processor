@@ -20,14 +20,56 @@ This project implements an automated workflow for:
 - **Vectorization**: Google Vertex AI or Voyage AI embedding generation with vector storage in Supabase
 
 ### MVP2: Query Interface
-- **Vector Search**: Similarity search using pgvector in Supabase
-- **Chat Interface**: Built with an n8n webhook endpoint
-- **Response Generation**: Using retrieved content with a provided chat prompt
+- **Input**: Natural language queries
+- **Processing**: Query embedding and vector similarity search
+- **Output**: Relevant document sections with context
 
-### Beta 1: Web Application Integration
-- **HTTP Webhook**: To replace Google Drive trigger
-- **API Layer**: For direct integration with web applications
-- **Authentication**: For secure document processing requests
+### Beta 1: Web App Integration
+- **Trigger**: Webhook for direct upload from web application
+- **Processing**: Same pipeline as MVP1
+- **Integration**: Web app frontend for document management and querying
+
+## Getting Started
+
+### Prerequisites
+- n8n.cloud account
+- Google account with access to Google Drive
+- Supabase account
+- Access to Google Vertex AI or Voyage AI APIs
+
+### Setup
+
+1. **Supabase Project**
+   - The Supabase project has been set up at: https://gppuubxnxuyuwixbtpho.supabase.co
+   - See [Supabase Configuration](docs/supabase-config.md) for details
+
+2. **n8n Workflow**
+   - Follow the [Import Guide](workflows/IMPORT_GUIDE.md) to import the workflow
+   - Configure the necessary credentials and environment variables
+
+3. **Google Drive**
+   - Set up a Google Drive folder for document monitoring
+   - Obtain the folder ID and add it to the n8n workflow variables
+
+## Documentation
+
+- [Import Guide](workflows/IMPORT_GUIDE.md): How to import the workflow into n8n.cloud
+- [Supabase Configuration](docs/supabase-config.md): Details about the Supabase setup
+- [Architecture](docs/architecture.md): System architecture and component interactions
+- [Database Design](docs/database.md): Supabase database schema and usage
+
+## GitHub Repository
+
+This project is maintained in a GitHub repository with the following branching strategy:
+- **main**: Production-ready code
+- **develop**: Integration branch for development work
+- **feature/**: Feature branches for individual tasks
+
+## Roadmap
+
+- MVP1: Document processing pipeline ✅
+- MVP2: Query interface (coming soon)
+- Beta 1: Web app integration (coming soon)
 
 ## Implementation Details
 
