@@ -26,7 +26,6 @@
   - [x] Document upload component with drag-and-drop
   - [x] Document listing with sorting and filtering
   - [ ] Document detail page
-- [ ] Implement responsive design for mobile devices
 - [ ] Implement client-side form validation
 - [ ] Add loading states and error handling
 
