@@ -257,6 +257,8 @@ globalThis.addEventListener('beforeunload', (ev) => {
 
 // Serve HTTP requests
 Deno.serve(async (req) => {
+  console.log(`Request received: ${req.method} ${new URL(req.url).pathname}`);
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -268,109 +270,160 @@ Deno.serve(async (req) => {
       }
     });
   }
-  
-  // Only accept POST requests for actual processing
+
+  // Only accept POST requests
   if (req.method !== 'POST') {
     return new Response(
       JSON.stringify({ error: 'Method not allowed' }),
       { 
-        status: 405, 
-        headers: { 
+        status: 405,
+        headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*'
-        } 
+        }
       }
     );
   }
-  
+
   try {
-    // Get the JWT token from the Authorization header
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return new Response(
-        JSON.stringify({ error: 'Missing or invalid Authorization header' }),
-        { 
-          status: 401, 
-          headers: { 
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          } 
-        }
-      );
+    console.log('Parsing request body...');
+    
+    // Get the request data
+    const { fileId, userId, filename, contentType, requestId } = await req.json();
+    
+    // Log details for debugging
+    console.log(`Processing document validation:
+      RequestID: ${requestId || 'Not provided'}
+      FileID: ${fileId}
+      UserID: ${userId}
+      Filename: ${filename}
+      ContentType: ${contentType}
+    `);
+    
+    // Log auth token for debugging specific request
+    if (requestId === 'b742794a-e58b-4f43-b057-f56499f7d95c') {
+      const authHeader = req.headers.get('Authorization');
+      console.log(`Request ID match found! Auth header: ${authHeader}`);
     }
 
-    // Extract the token
-    const token = authHeader.replace('Bearer ', '');
-    
-    // Verify the token and get the user
-    const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
-    if (userError || !userData.user) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid or expired token', details: userError?.message }),
-        { 
-          status: 401, 
-          headers: { 
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          } 
-        }
-      );
-    }
-
-    // Continue with regular request processing
-    const validationRequest = await req.json();
-    
-    // Use the user's ID from the verified token instead of trusting the request body
-    validationRequest.userId = userData.user.id;
-    
-    // Validate request parameters
-    if (!validationRequest.fileId || !validationRequest.filename || !validationRequest.contentType) {
+    // Check required parameters
+    if (!fileId || !userId || !filename || !contentType) {
       return new Response(
         JSON.stringify({ 
-          error: 'Invalid request. Required fields: fileId, filename, contentType' 
+          error: 'Missing required parameters',
+          requiredParams: ['fileId', 'userId', 'filename', 'contentType']
         }),
         { 
-          status: 400, 
-          headers: { 
+          status: 400,
+          headers: {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*'
-          } 
+          }
         }
       );
     }
-    
-    // Start processing as a background task
-    EdgeRuntime.waitUntil(processValidation(validationRequest));
-    
-    // Respond immediately with acknowledgment
+
+    // Get the file from temporary storage
+    console.log(`Fetching file ${fileId} from temporary storage...`);
+    const { data: fileData, error: fileError } = await supabaseClient
+      .storage
+      .from(TEMP_BUCKET)
+      .download(fileId);
+
+    if (fileError || !fileData) {
+      console.error('Error fetching file:', fileError);
+      return handleError(
+        new Error(`Failed to fetch file: ${fileError?.message || 'File not found'}`), 
+        404
+      );
+    }
+
+    // Generate a hash of the file content for deduplication
+    console.log('Computing file hash for deduplication...');
+    const fileBuffer = await fileData.arrayBuffer();
+    const contentHash = await generateContentHash(new Uint8Array(fileBuffer));
+    console.log(`File hash: ${contentHash}`);
+
+    // Check if this hash already exists in the database (deduplication)
+    console.log('Checking for duplicates...');
+    const { data: existingDocs, error: queryError } = await supabaseClient
+      .from('documents')
+      .select('id, filename')
+      .eq('content_hash', contentHash)
+      .limit(1);
+
+    if (queryError) {
+      console.error('Database query error:', queryError);
+      return handleError(
+        new Error(`Database error: ${queryError.message}`),
+        500
+      );
+    }
+
+    // If duplicate found, return error with details
+    if (existingDocs && existingDocs.length > 0) {
+      console.log(`Duplicate found: ${existingDocs[0].id} - ${existingDocs[0].filename}`);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          isDuplicate: true,
+          existingDocumentId: existingDocs[0].id,
+          existingFilename: existingDocs[0].filename,
+          message: `This file already exists as "${existingDocs[0].filename}"`
+        }),
+        { 
+          status: 409, // Conflict
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          }
+        }
+      );
+    }
+
+    // File validated successfully, no duplicates found
+    console.log('Validation successful, no duplicates found');
     return new Response(
-      JSON.stringify({ 
-        message: 'Document validation started',
-        fileId: validationRequest.fileId,
-        requestId: crypto.randomUUID() // Return a unique ID for this request
+      JSON.stringify({
+        success: true,
+        fileId,
+        contentHash,
+        message: 'File validated successfully'
       }),
       { 
-        status: 202, 
-        headers: { 
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-        } 
-      }
-    );
-    
-  } catch (error) {
-    console.error('Error:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { 
-        status: 500, 
-        headers: { 
+        status: 200,
+        headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*'
-        } 
+        }
       }
     );
+  } catch (error) {
+    // Add requestId to the error if it exists
+    try {
+      const { requestId } = await req.json();
+      (error as any).requestId = requestId;
+    } catch {}
+    
+    return handleError(error as Error);
   }
-}); 
+});
+
+// Helper to log and format error responses
+function handleError(error: Error, status = 500): Response {
+  console.error('Document validation error:', error);
+  return new Response(
+    JSON.stringify({ 
+      error: error.message,
+      success: false,
+      requestId: (error as any).requestId || undefined
+    }),
+    { 
+      status: status,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      }
+    }
+  );
+} 

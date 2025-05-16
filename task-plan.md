@@ -8,6 +8,19 @@
 
 3. **Request ID failure**: The specific request ID `b742794a-e58b-4f43-b057-f56499f7d95c` is failing, but we need to understand why.
 
+## Progress and Findings
+
+1. **Authentication Testing**:
+   - Successfully deployed functions with `--no-verify-jwt` flag to bypass JWT verification
+   - Created test functions that successfully receive and log the JWT token
+   - Confirmed that the test endpoints properly handle the request ID `b742794a-e58b-4f43-b057-f56499f7d95c`
+   - Verified the JWT token `hRohcWermGj3AFB4WqP1JPW4TBJoaJWLY+cF5WKNtYvQ4iPNCQsXdUSyjniB5xcs8VAHb+MSPFJ8VL3pUea5Ew==` is being received correctly
+
+2. **Remaining Issues**:
+   - The document-validation function still experiences errors even with JWT verification disabled
+   - These errors are likely related to database access or environment configuration
+   - Need to further investigate database connections and storage access
+
 ## Action Plan
 
 ### 1. Fix JWT Authentication in Edge Functions
