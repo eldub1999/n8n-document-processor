@@ -9,8 +9,6 @@ const HomePage = lazy(() => import('./pages/HomePage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const DocumentsPage = lazy(() => import('./pages/DocumentsPage'));
-const DocumentDetailPage = lazy(() => import('./pages/DocumentDetailPage'));
-const UploadPage = lazy(() => import('./pages/UploadPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 // Loading component for lazy loaded routes
@@ -31,8 +29,6 @@ function App() {
               <Route path="login" element={<LoginPage />} />
               <Route path="register" element={<RegisterPage />} />
               <Route path="documents" element={<DocumentsPage />} />
-              <Route path="documents/:id" element={<DocumentDetailPage />} />
-              <Route path="upload" element={<UploadPage />} />
               <Route path="404" element={<NotFoundPage />} />
               <Route path="*" element={<Navigate to="/404" replace />} />
             </Route>
