@@ -1,0 +1,19 @@
+{
+  "name": "schema-test",
+  "version": "1.0.0",
+  "description": "Test script for database schema updates",
+  "main": "schema-test.ts",
+  "type": "module",
+  "scripts": {
+    "test": "ts-node schema-test.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.38.5",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+} 
