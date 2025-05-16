@@ -31,12 +31,10 @@
 - [ ] Add loading states and error handling
 
 ## Backend Implementation
-- [ ] Implement Edge Function for document processing
-  - [ ] Extract text content from uploaded documents
-  - [ ] Store extracted text in database
-  - [ ] Generate document summaries using AI
+- [ ] Implement Edge Function for basic document processing
+  - [ ] Validate uploaded documents
+  - [ ] Generate thumbnails for supported file types
 - [ ] Set up webhooks for document processing status updates
-- [ ] Implement search functionality for document content
 
 ## Testing and Deployment
 - [ ] Write unit tests for critical components
