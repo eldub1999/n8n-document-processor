@@ -20,9 +20,9 @@
 - [x] Update workflow to use Google Vertex AI or Anthropic embeddings instead of OpenAI
 - [x] Create combined workflow JSON with provider selection via Switch node
 - [x] Clean up project directory and consolidate workflow files
+- [x] Set up GitHub repository with main and develop branches
 
 ### In Progress
-- [ ] Set up GitHub repository for the project
 - [ ] Set up Supabase project
 
 ### Upcoming Tasks
@@ -44,6 +44,7 @@
 - [x] Replace OpenAI embeddings with Google/Anthropic alternatives
 - [x] Create combined workflow with embedding provider selection
 - [x] Clean up and consolidate into a single importable workflow file
+- [x] Set up GitHub repository with branching strategy
 - [ ] Test document import to Supabase
 - [ ] Test document pre-processing pipeline
 - [ ] Test embedding generation
