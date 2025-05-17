@@ -16,64 +16,85 @@
    - Confirmed that the test endpoints properly handle the request ID `b742794a-e58b-4f43-b057-f56499f7d95c`
    - Verified the JWT token `hRohcWermGj3AFB4WqP1JPW4TBJoaJWLY+cF5WKNtYvQ4iPNCQsXdUSyjniB5xcs8VAHb+MSPFJ8VL3pUea5Ew==` is being received correctly
 
-2. **Remaining Issues**:
-   - The document-validation function still experiences errors even with JWT verification disabled
-   - These errors are likely related to database access or environment configuration
-   - Need to further investigate database connections and storage access
+2. **Configuration Implementation**:
+   - Added `config.toml` file to configure JWT verification for Edge Functions
+   - Created client-side invocation script using the Supabase client that properly handles authentication
+   - Added enhanced error handling and logging to the document-validation function
+   - Successfully deployed updated Edge Functions
 
-## Action Plan
+3. **Remaining Issues**:
+   - The document-validation function still returns a non-2xx status code when invoked through the client
+   - The error appears to be related to the file access or database operations
+   - Need to add better error handling to identify the specific error
 
-### 1. Fix JWT Authentication in Edge Functions
+## Recommended Solution
 
-1. Modify both edge functions to handle authentication properly:
-   - Update the JWT verification logic in both functions
-   - Add proper error handling for authentication failures
-   - Implement an optional "development mode" that allows testing without JWT verification
+Based on our findings, we recommend implementing the following solution:
 
-2. Deploy updated functions to Supabase:
-   ```bash
-   supabase functions deploy document-validation
-   supabase functions deploy document-processing
-   ```
+1. **Configuration Approach**: 
+   - Continue using the `config.toml` file to disable JWT verification for development/testing
+   - Configure proper JWT verification for production deployment
 
-### 2. Implement User Authentication in Test Script
+2. **Client-Side Invocation**:
+   - Use the Supabase client to invoke Edge Functions as shown in our test script
+   - This approach properly handles authentication tokens and headers
 
-1. Create a test script that generates a valid JWT token:
-   - Use Supabase JS client to sign in and obtain a valid token
-   - Test with both anonymous and authenticated tokens
-   - Add detailed logging for all steps
+3. **Error Handling Improvements**:
+   - Add structured error logging to Edge Functions
+   - Create specific error types for different kinds of failures
+   - Implement graceful fallbacks for database and storage access
 
-2. Test specific request ID flow:
-   - Create a test that mimics the exact flow of the failing request
-   - Add tracing and detailed logging to pinpoint failure point
-
-### 3. Add Error Monitoring & Logging
-
-1. Enhance error logging in edge functions:
-   - Add structured logging for all operations
-   - Create detailed error responses with context information
-   - Log request IDs and correlation IDs for traceability
-
-2. Implement application monitoring:
-   - Add performance tracing to track request processing time
-   - Log edge function invocations and results to a database table
-   - Create a dashboard for monitoring function performance
-
-### 4. Deploy and Test in Production
-
-1. Test updated functions with the failing request ID:
-   - Deploy updated functions to Supabase
-   - Run test script against production environment
-   - Verify function execution and authentication
-
-2. Document the fix and results:
-   - Update documentation with authentication requirements
-   - Create example scripts for testing edge functions
-   - Document lessons learned and best practices
+4. **Temporary Test Files**:
+   - Create test files in the storage buckets to allow proper testing 
+   - Implement a cleanup mechanism to remove test files
 
 ## Next Steps
 
-1. Begin with implementing authentication fixes in edge functions
-2. Update the test script to handle proper authentication
-3. Add comprehensive logging to trace the failing request ID
-4. Deploy changes and verify the fix 
+1. Create a test file in the temp-uploads bucket for testing
+2. Improve error handling in the document-validation function
+3. Add database error simulation/handling for more robust code
+4. Create a comprehensive test suite for Edge Functions
+
+This approach will ensure reliable operation of the Edge Functions while maintaining proper security.
+
+## Task Plan for Document Validation and Deduplication
+
+### Completed Tasks:
+1. ✅ Identified issues with edge function authentication
+2. ✅ Created test functions for troubleshooting
+3. ✅ Isolated JWT validation issues
+4. ✅ Added JWT bypass method via config.toml
+5. ✅ Created browser-based test for edge functions
+6. ✅ Troubleshooted direct API invocation issues with JWT
+7. ✅ Fixed module import errors in document-validation function
+8. ✅ Created and deployed simplified version of document-validation function
+9. ✅ Verified direct JWT token invocation works correctly
+10. ✅ Documented edge function best practices in edgefunctions.md
+
+### Next Steps:
+1. Implement document deduplication in document-validation function:
+   - Add hash-based content comparison
+   - Integrate with database for duplicate checking
+   - Return appropriate responses for duplicate detection
+
+2. Update frontend to handle duplicate responses:
+   - Add error handling for duplicate documents
+   - Show user-friendly messages for duplicates
+   - Prevent duplicate uploads in the UI
+
+3. Create comprehensive tests for edge functions:
+   - Test the document-validation with various file types
+   - Verify duplicate detection works correctly
+   - Create automated tests for CI/CD
+
+### Notes:
+- Direct JWT invocation now working with proper token formatting:
+  - Token must include "Bearer " prefix
+  - Properly formatted token allows direct API calls
+  - Client SDK handles this automatically
+
+- Production-ready document-validation function should include:
+  - Proper error handling
+  - Detailed logging
+  - Content hash verification
+  - Database integration for duplicate checking 
