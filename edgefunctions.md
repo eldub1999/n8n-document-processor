@@ -1,325 +1,555 @@
-# Supabase Edge Functions: Best Practices
+# Supabase Edge Functions: Implementation Guide for AI Assistants
 
-## Overview
+This guide is designed for AI coding assistants to quickly implement Supabase Edge Functions with proper authentication, error handling, and deployment.
 
-Supabase Edge Functions are serverless functions that run on Deno, providing a way to extend your backend functionality without managing server infrastructure. This document outlines best practices and lessons learned for developing, testing, and deploying Edge Functions.
+## Quick Start
 
-## Authentication & JWT Verification
+```typescript
+// Minimal working Edge Function template
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-### Common Issues
-- Direct curl requests to Edge Functions often fail with "Invalid JWT" errors
-- Supabase client-side invocation handles authentication correctly
-- JWT verification can interfere with development and testing
+// Function handler - starting point for your implementation
+Deno.serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-client-info'
+      }
+    });
+  }
 
-### Best Practices
-1. **Configuration Options**:
-   - Use `--no-verify-jwt` flag during development/testing: `supabase functions serve function-name --no-verify-jwt`
-   - Configure permanent JWT verification settings in `config.toml`:
-     ```toml
-     [functions.function-name]
-     verify_jwt = false
-     ```
+  try {
+    // Parse request body
+    const data = await req.json();
+    
+    // Process data...
+    
+    // Return successful response
+    return new Response(
+      JSON.stringify({ success: true, data: { /* results */ } }),
+      { 
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
+      }
+    );
+  } catch (error) {
+    // Handle errors
+    return new Response(
+      JSON.stringify({ success: false, error: error.message }),
+      { 
+        status: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
+      }
+    );
+  }
+});
+```
 
-2. **Client-Side Invocation**:
-   - Always use the Supabase client for proper authentication:
-     ```javascript
-     const { data, error } = await supabase.functions.invoke('function-name', {
-       body: { /* request payload */ }
-     })
-     ```
-   - Never rely on direct HTTP calls for production usage
+## Creating and Deploying Functions
 
-3. **Direct Invocation with JWT**:
-   - For external integrations or testing, you can directly invoke functions with a JWT token:
-     ```bash
-     curl -X POST https://your-project-ref.supabase.co/functions/v1/function-name \
-     -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-     -H "Content-Type: application/json" \
-     -d '{"param1": "value1"}'
-     ```
-   - The token must be prefixed with "Bearer " (note the space after)
-   - Ensure the token is valid and not expired
-   - This approach is useful for integration with external systems or workflows like n8n
-   - We've confirmed this works with our document-validation function when using a valid JWT token
+### 1. Function Creation
 
-4. **Testing Authentication**:
-   - Create simplified test functions to isolate authentication issues
-   - Test both authentication-bypassed and authenticated scenarios
-   - Implement proper error handling for authentication failures
+```bash
+# Create a new function
+supabase functions new function-name
 
-## Error Handling & Logging
+# Structure of the function
+functions/
+└── function-name/
+    └── index.ts    # Main function code
+```
 
-### Best Practices
-1. **Structured Error Responses**:
-   - Use consistent error response format:
-     ```javascript
-     return new Response(
-       JSON.stringify({ 
-         success: false, 
-         error: error.message,
-         requestId: requestId
-       }),
-       { 
-         status: statusCode,
-         headers: {
-           'Content-Type': 'application/json',
-           'Access-Control-Allow-Origin': '*'
-         }
-       }
-     );
-     ```
+### 2. Deployment
 
-2. **Comprehensive Logging**:
-   - Log request details at the start of processing
-   - Log important operation steps with relevant details
-   - Include request ID in all log messages for traceability
-   - Log headers for debugging authentication issues
+```bash
+# Deploy with JWT verification (default)
+supabase functions deploy function-name
 
-3. **Graceful Error Handling**:
-   - Catch and handle errors at multiple levels
-   - Provide specific error messages for different failure types
-   - Include helper functions for error formatting
+# Deploy without JWT verification (for public functions)
+supabase functions deploy function-name --no-verify-jwt
+```
 
-## Function Structure & Performance
+### 3. Configuration via config.toml
 
-### Best Practices
-1. **Code Organization**:
-   - Separate core logic from request handling
-   - Use helper functions for reusable operations
-   - Implement clean separation of concerns
+```toml
+# ./supabase/config.toml
+# Disable JWT verification for specific functions
+[functions.function-name]
+verify_jwt = false
+```
 
-2. **Performance Considerations**:
-   - Minimize database queries and storage operations
-   - Use efficient data structures and algorithms
-   - Implement proper cleanup of temporary resources
+## JWT Authentication: Implementation Guide
 
-3. **Security Practices**:
-   - Validate all input parameters
-   - Use service role keys cautiously
-   - Implement proper authorization checks
+### Critical Authentication Points
 
-4. **Correct Module Imports**:
-   - Be careful with Deno module imports - they can change between versions
-   - Use correct import paths and exports for crypto and other modules
-   - When using hashing, use the current API:
-     ```typescript
-     // Correct way to import and use crypto in Deno
-     import { create } from "https://deno.land/std@0.202.0/crypto/mod.ts";
-     
-     // Create a hash
-     const hash = await create("sha256").update(data).digest();
-     ```
+1. **Key JWT Authentication Issues**:
+   - Direct API calls require properly formatted JWT tokens
+   - The Supabase client handles token management automatically
+   - JWT verification is enabled by default for security
+
+2. **Implementation Options**:
+
+   a. **Client-Side Invocation (Recommended)**:
+   ```javascript
+   // Client-side code
+   const { data, error } = await supabase.functions.invoke('function-name', {
+     body: { /* payload */ }
+   });
+   
+   if (error) console.error('Error:', error);
+   else console.log('Result:', data);
+   ```
+
+   b. **Direct API Invocation with JWT**:
+   ```javascript
+   // Extract JWT token from authenticated Supabase client
+   const token = supabase.auth.session()?.access_token;
+   
+   // Use token in fetch request
+   const response = await fetch(
+     'https://your-project-ref.supabase.co/functions/v1/function-name',
+     {
+       method: 'POST',
+       headers: {
+         'Authorization': `Bearer ${token}`,
+         'Content-Type': 'application/json'
+       },
+       body: JSON.stringify({ /* payload */ })
+     }
+   );
+   ```
+
+   c. **Curl Testing Example**:
+   ```bash
+   curl -X POST https://your-project-ref.supabase.co/functions/v1/function-name \
+   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+   -H "Content-Type: application/json" \
+   -d '{"param1": "value1"}'
+   ```
+
+### Authentication Implementation Within Edge Functions
+
+```typescript
+// Helper function to verify authentication - inside your Edge Function
+async function requireAuth(req: Request) {
+  const authHeader = req.headers.get('Authorization');
+  
+  if (!authHeader) {
+    throw new Error('Missing authorization header');
+  }
+  
+  // Extract token - handle Bearer prefix
+  const token = authHeader.replace('Bearer ', '');
+  
+  // Verify the token using Supabase client
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') || '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+  );
+  
+  // You can use JWT validation here or rely on Supabase's default verification
+  // This example gets the user from the token
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  
+  if (error || !user) {
+    throw new Error('Invalid authorization');
+  }
+  
+  return user;
+}
+
+// Usage in your Edge Function handler
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    // Handle CORS preflight...
+  }
+  
+  try {
+    // Verify authentication
+    const user = await requireAuth(req);
+    
+    // Process authenticated request...
+    const data = await req.json();
+    
+    // Return successful response...
+  } catch (error) {
+    // Return error response...
+  }
+});
+```
+
+## Common Pitfalls and Solutions
+
+### 1. Module Import Errors
+
+**Problem**: Errors like `The requested module does not provide an export named 'X'`
+
+**Solution**:
+```typescript
+// Correct crypto module import - use create instead of createHash
+import { create } from "https://deno.land/std@0.202.0/crypto/mod.ts";
+
+// Create a hash correctly
+const hash = await create("sha256").update(data).digest();
+```
+
+### 2. Boot Errors
+
+**Problem**: Function fails to start with "Function failed to start"
+
+**Solution**:
+- Start with minimal function code and add complexity incrementally
+- Check all import paths and export names carefully
+- Verify environment variables are available at startup
+- Test with a simplified function first:
+
+```typescript
+// Minimal function to verify deployment works
+Deno.serve(async (req) => {
+  return new Response(
+    JSON.stringify({ success: true, message: "Function is working" }),
+    { 
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    }
+  );
+});
+```
+
+### 3. CORS Issues
+
+**Problem**: Browser requests fail with CORS errors
+
+**Solution**:
+```typescript
+// Always include proper CORS headers
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-client-info'
+};
+
+// Handle OPTIONS requests for CORS preflight
+if (req.method === 'OPTIONS') {
+  return new Response(null, { 
+    status: 204, 
+    headers: corsHeaders 
+  });
+}
+
+// Include same headers in your responses
+return new Response(
+  JSON.stringify({ success: true, data }),
+  { 
+    status: 200,
+    headers: { 
+      'Content-Type': 'application/json',
+      ...corsHeaders
+    }
+  }
+);
+```
+
+## Database and Storage Access Patterns
+
+### Accessing Supabase Services
+
+```typescript
+// Initialize Supabase client
+const supabaseClient = createClient(
+  Deno.env.get('SUPABASE_URL') || '',
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+);
+
+// Database query - check for duplicates example
+async function checkForDuplicates(contentHash) {
+  const { data, error } = await supabaseClient
+    .from('documents')
+    .select('id, filename')
+    .eq('content_hash', contentHash)
+    .limit(1);
+    
+  if (error) throw new Error(`Database error: ${error.message}`);
+  return { isDuplicate: data.length > 0, existingFile: data[0] };
+}
+
+// Storage operations
+async function downloadFile(bucket, path) {
+  const { data, error } = await supabaseClient
+    .storage.from(bucket)
+    .download(path);
+    
+  if (error) throw new Error(`Download failed: ${error.message}`);
+  return data;
+}
+```
+
+## Response Format Standards
+
+### Successful Response
+
+```typescript
+return new Response(
+  JSON.stringify({
+    success: true,
+    data: {
+      // Your result data here
+    },
+    requestId: requestId // optional tracking
+  }),
+  { 
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*'
+    }
+  }
+);
+```
+
+### Error Response
+
+```typescript
+return new Response(
+  JSON.stringify({
+    success: false,
+    error: error.message,
+    code: error.code, // optional error code
+    requestId: requestId // optional tracking
+  }),
+  { 
+    status: errorStatusCode, // appropriate HTTP status code
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*'
+    }
+  }
+);
+```
+
+## Comprehensive Function Example
+
+```typescript
+// Complete Edge Function with authentication, error handling, and database operations
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { create } from 'https://deno.land/std@0.202.0/crypto/mod.ts';
+
+// Initialize Supabase client
+const supabaseClient = createClient(
+  Deno.env.get('SUPABASE_URL') || '',
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+);
+
+// Constants
+const DOCUMENTS_BUCKET = 'documents';
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-client-info'
+};
+
+// Generate hash from file content
+async function generateContentHash(fileData) {
+  const hash = await create("sha256").update(fileData).digest();
+  return Array.from(new Uint8Array(hash))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+// Check for duplicates in database
+async function checkForDuplicates(contentHash) {
+  const { data, error } = await supabaseClient
+    .from('documents')
+    .select('id, filename')
+    .eq('content_hash', contentHash)
+    .limit(1);
+    
+  if (error) throw new Error(`Database error: ${error.message}`);
+  return { isDuplicate: data.length > 0, existingFile: data[0] };
+}
+
+// Main function handler
+Deno.serve(async (req) => {
+  // Generate unique request ID for tracking
+  const requestId = crypto.randomUUID();
+  console.log(`Processing request ${requestId}`);
+  
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
+
+  try {
+    // Parse request
+    const { fileId, userId, filename } = await req.json();
+    
+    if (!fileId || !userId) {
+      throw new Error('Missing required parameters');
+    }
+    
+    console.log(`Processing file: ${filename} for user: ${userId}`);
+    
+    // Download file from temporary storage
+    const fileData = await supabaseClient
+      .storage.from('temp-uploads')
+      .download(fileId);
+      
+    if (!fileData.data) {
+      throw new Error(`File download failed: ${fileData.error?.message}`);
+    }
+    
+    // Generate content hash
+    const contentHash = await generateContentHash(fileData.data);
+    console.log(`Content hash generated: ${contentHash}`);
+    
+    // Check for duplicates
+    const { isDuplicate, existingFile } = await checkForDuplicates(contentHash);
+    
+    if (isDuplicate) {
+      console.log(`Duplicate file detected: ${existingFile.filename}`);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Duplicate document detected',
+          duplicateFile: existingFile,
+          requestId
+        }),
+        { 
+          status: 409, // Conflict status code
+          headers: {
+            'Content-Type': 'application/json',
+            ...CORS_HEADERS
+          }
+        }
+      );
+    }
+    
+    // Process the document (simplified example)
+    console.log(`Document validation passed, processing file: ${filename}`);
+    
+    // Return success
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: 'Document validated successfully',
+        metadata: {
+          contentHash,
+          userId,
+          filename
+        },
+        requestId
+      }),
+      { 
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          ...CORS_HEADERS
+        }
+      }
+    );
+  } catch (error) {
+    // Log error details
+    console.error(`Error processing request ${requestId}: ${error.message}`);
+    
+    // Return error response
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+        requestId
+      }),
+      { 
+        status: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          ...CORS_HEADERS
+        }
+      }
+    );
+  }
+});
+```
 
 ## Testing Strategies
 
-### Local Testing
-1. **Setup**:
-   - Use `supabase functions serve function-name` for local development
-   - Configure `--no-verify-jwt` flag or `config.toml` settings
-   - Create test scripts that use the Supabase client
+### Client-Side Testing (Recommended)
 
-2. **Test Scripts**:
-   - Implement dedicated test scripts for each function
-   - Use proper logging to capture request/response details
-   - Create test cases for both success and failure scenarios
+```javascript
+// In Node.js or browser environment
+import { createClient } from '@supabase/supabase-js';
 
-3. **Debugging Techniques**:
-   - Log headers and authentication tokens
-   - Use structured logging with severity levels
-   - Create simplified test functions to isolate issues
+const supabase = createClient(
+  'https://your-project-ref.supabase.co',
+  'your-anon-key'
+);
 
-4. **Dealing with Local Environment Issues**:
-   - If `supabase start` fails due to Docker conflicts, focus on remote testing
-   - Use remote deployment for testing when local environment is problematic
-   - Keep minimal test functions for isolating specific functionality
+// Authenticate user if needed
+await supabase.auth.signIn({
+  email: 'test@example.com',
+  password: 'test-password'
+});
 
-### Remote Testing
-1. **Deployment Testing**:
-   - Deploy functions with `supabase functions deploy function-name`
-   - Verify function operation in the remote environment
-   - Test with actual storage buckets and database
+// Invoke function with authentication automatically handled
+const { data, error } = await supabase.functions.invoke('function-name', {
+  body: { param1: 'value1' }
+});
 
-2. **Test Data**:
-   - Create test files in storage buckets for function testing
-   - Implement cleanup mechanisms to remove test data
-   - Use unique identifiers for test data for easy tracking
+console.log('Response:', data);
+if (error) console.error('Error:', error);
+```
 
-3. **Direct Remote Testing**:
-   - Use client-side invocation with proper authentication
-   - Test against your production or development project directly
-   - Set up separate test buckets to avoid affecting production data
+### Direct Testing with Authentication Token
 
-4. **Debugging Remote Functions**:
-   - Use the Supabase logs UI to examine function logs
-   - Run specific test cases that produce identifiable log entries
-   - Implement structured logging with standard error formats
+```javascript
+// Get token from session
+const session = supabase.auth.session();
+const token = session?.access_token;
 
-## Deployment Workflow
-
-### Best Practices
-1. **Deployment Process**:
-   - Test functions locally first (if environment allows)
-   - Deploy with specific configuration settings: `supabase functions deploy function-name [--no-verify-jwt]`
-   - Verify function operation after deployment with test scripts
-
-2. **Version Control**:
-   - Keep Edge Functions in version control
-   - Maintain function configurations in `config.toml`
-   - Document function changes and deployment requirements
-
-3. **Monitoring**:
-   - Implement proper logging for production monitoring
-   - Add metrics collection for function performance
-   - Set up alerts for function failures
-
-## Troubleshooting Common Issues
-
-### Docker/Local Environment Problems
-- **Symptoms**: `supabase start is not running` errors, container conflicts, memory issues
-- **Solutions**:
-  - Focus on remote testing rather than local environment
-  - Use standalone test scripts with direct API access
-  - Deploy minimal test functions to isolate specific functionality
-  - Implement client-side test scripts that don't require local Docker
-
-### JWT Authentication Failures
-- **Symptoms**: "Invalid JWT" errors when calling functions directly
-- **Solutions**:
-  - Always use the Supabase client for function invocation
-  - Configure JWT verification settings in config.toml
-  - Deploy with `--no-verify-jwt` during testing
-  - Verify session management in test scripts
-
-### Storage Access Issues
-- **Symptoms**: Storage bucket access failures, "not found" errors
-- **Solutions**:
-  - Verify bucket names and paths (check for case sensitivity issues)
-  - Ensure proper permissions in RLS policies
-  - Create test files with known paths for verification
-  - Implement specific error handling for storage operations
-
-### Database Connection Problems
-- **Symptoms**: Database query failures, connection errors
-- **Solutions**:
-  - Add specific error handling for database operations
-  - Check RLS policies for proper access control
-  - Test with minimal database operations first
-  - Use transaction management for complex operations
-
-### Boot Errors
-- **Symptoms**: Function fails to start with message like "Function failed to start" or error logs showing "worker boot error"
-- **Solutions**:
-  - Check module import paths - they can change between Deno versions
-  - Verify that all imported modules are correctly referenced
-  - Look for syntax errors in the function code
-  - Watch for incorrect API usage, such as the crypto module imports
-  - Implement incremental testing with minimal functions to isolate issues
-  - Check environment variables that might be referenced during initialization
-
-## Common Edge Function Patterns
-
-### Document Processing
-```typescript
-// Process documents with proper error handling
-async function processDocument(fileId: string): Promise<Record<string, any>> {
-  try {
-    // 1. Fetch file from storage
-    const { data: fileData, error: downloadError } = await supabaseClient
-      .storage.from('bucket-name')
-      .download(fileId);
-      
-    if (downloadError) {
-      throw new Error(`Download failed: ${downloadError.message}`);
-    }
-    
-    // 2. Process file
-    const result = await someProcessingFunction(fileData);
-    
-    // 3. Store results
-    const { error: uploadError } = await supabaseClient
-      .from('table-name')
-      .insert({ result });
-      
-    if (uploadError) {
-      throw new Error(`Database operation failed: ${uploadError.message}`);
-    }
-    
-    return { success: true, result };
-  } catch (error) {
-    console.error(`Processing error: ${error.message}`);
-    return { success: false, error: error.message };
+// Make direct request
+const response = await fetch(
+  'https://your-project-ref.supabase.co/functions/v1/function-name',
+  {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ param1: 'value1' })
   }
-}
+);
+
+const result = await response.json();
+console.log('Result:', result);
 ```
 
-### Authentication Wrapper
-```typescript
-// Helper function to handle authenticated requests
-function requireAuth(handler) {
-  return async (req) => {
-    try {
-      // Get JWT from request
-      const authHeader = req.headers.get('Authorization');
-      if (!authHeader) {
-        return new Response(
-          JSON.stringify({ error: 'Missing authorization header' }),
-          { status: 401 }
-        );
-      }
-      
-      // Verify JWT and get user
-      const token = authHeader.replace('Bearer ', '');
-      const { data: user, error } = await verifyToken(token);
-      
-      if (error) {
-        return new Response(
-          JSON.stringify({ error: 'Invalid authorization' }),
-          { status: 401 }
-        );
-      }
-      
-      // Call handler with authenticated user
-      return await handler(req, user);
-    } catch (error) {
-      return new Response(
-        JSON.stringify({ error: error.message }),
-        { status: 500 }
-      );
-    }
-  };
-}
+### Testing Without Authentication
+
+If testing a function with JWT verification disabled:
+
+```bash
+# Deploy function without JWT verification
+supabase functions deploy function-name --no-verify-jwt
+
+# Test with curl - no authentication required
+curl -X POST https://your-project-ref.supabase.co/functions/v1/function-name \
+  -H "Content-Type: application/json" \
+  -d '{"param1": "value1"}'
 ```
 
-## Lessons Learned
+## Monitoring and Debugging
 
-1. **JWT Verification**:
-   - Direct curl requests to Edge Functions fail with "Invalid JWT" errors
-   - Supabase client-side invocation handles authentication correctly
-   - Use config.toml for permanent JWT configuration settings
-
-2. **Testing Approaches**:
-   - Create simplified test functions to isolate issues
-   - Test with the specific JWT token to verify reception
-   - Implement proper error handling to identify specific errors
-   - When local testing environment fails, focus on remote testing with proper client-side invocation
-
-3. **Error Handling**:
-   - Add comprehensive logging for each processing step
-   - Handle database and storage access errors gracefully
-   - Implement specific error types for different failure scenarios
-
-4. **Performance Considerations**:
-   - Minimize database queries and storage operations
-   - Implement proper cleanup of temporary resources
-   - Use efficient data structures and algorithms
-
-5. **Environment Management**:
-   - Local Docker environment may face conflicts and resource limitations
-   - Remote deployment and testing can be more reliable than local testing
-   - Use direct client invocation for reliable testing regardless of environment
-
-6. **Module Import Issues**:
-   - Be careful with module versions and import paths
-   - The error `Uncaught SyntaxError: The requested module does not provide an export named 'X'` usually indicates incorrect import paths or API usage
-   - Use incremental deployment and testing with minimal code to isolate import issues
-   - Check Deno documentation for current module API usage patterns 
+- Access logs in Supabase Dashboard
+- Use unique request IDs in all logging
+- Structure log messages for easy searching
+- Use console.log/console.error with descriptive prefixes
+- Log key operations and state changes 
