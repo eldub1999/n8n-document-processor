@@ -31,6 +31,12 @@ export interface Database {
           created_at: string;
           updated_at: string;
           description: string | null;
+          content_hash: string | null;
+          version: number;
+          is_latest: boolean;
+          jurisdiction: string | null;
+          county: string | null;
+          document_type: string | null;
         };
         Insert: {
           id?: string;
@@ -42,6 +48,12 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
           description?: string | null;
+          content_hash?: string | null;
+          version?: number;
+          is_latest?: boolean;
+          jurisdiction?: string | null;
+          county?: string | null;
+          document_type?: string | null;
         };
         Update: {
           id?: string;
@@ -53,6 +65,41 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
           description?: string | null;
+          content_hash?: string | null;
+          version?: number;
+          is_latest?: boolean;
+          jurisdiction?: string | null;
+          county?: string | null;
+          document_type?: string | null;
+        };
+      };
+      document_versions: {
+        Row: {
+          id: string;
+          document_id: string;
+          version_number: number;
+          storage_path: string;
+          created_at: string;
+          created_by: string | null;
+          expiry_date: string;
+        };
+        Insert: {
+          id?: string;
+          document_id: string;
+          version_number: number;
+          storage_path: string;
+          created_at?: string;
+          created_by?: string | null;
+          expiry_date: string;
+        };
+        Update: {
+          id?: string;
+          document_id?: string;
+          version_number?: number;
+          storage_path?: string;
+          created_at?: string;
+          created_by?: string | null;
+          expiry_date?: string;
         };
       };
     };
