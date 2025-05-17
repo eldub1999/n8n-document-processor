@@ -29,4 +29,39 @@ supabase/.temp/
 
 # OS specific files
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# Dependencies
+npm-debug.log
+yarn-error.log
+package-lock.json
+
+# Build outputs
+dist
+build
+.vite
+.output
+.nuxt
+
+# Editor directories and files
+.vscode
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Local development files
+*.backup
+*.bak
+
+# Test files
+test-scripts/deduplication-test.ts
+test-scripts/edge-function-test.js
+test-scripts/function-test.html
+test-scripts/log-to-file.js
+test-scripts/request-id-check.js
+test-scripts/request-lookup.js
+test-scripts/request-lookup.ts
+test-scripts/test-bypass-auth.js 
