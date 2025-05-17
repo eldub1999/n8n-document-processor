@@ -29,7 +29,20 @@ Supabase Edge Functions are serverless functions that run on Deno, providing a w
      ```
    - Never rely on direct HTTP calls for production usage
 
-3. **Testing Authentication**:
+3. **Direct Invocation with JWT**:
+   - For external integrations or testing, you can directly invoke functions with a JWT token:
+     ```bash
+     curl -X POST https://your-project-ref.supabase.co/functions/v1/function-name \
+     -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"param1": "value1"}'
+     ```
+   - The token must be prefixed with "Bearer " (note the space after)
+   - Ensure the token is valid and not expired
+   - This approach is useful for integration with external systems or workflows like n8n
+   - We've confirmed this works with our document-validation function when using a valid JWT token
+
+4. **Testing Authentication**:
    - Create simplified test functions to isolate authentication issues
    - Test both authentication-bypassed and authenticated scenarios
    - Implement proper error handling for authentication failures
