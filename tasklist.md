@@ -125,11 +125,14 @@
 ## Database Schema Updates
 - [x] Add content_hash field to documents table
 - [x] Add version and is_latest fields to documents table
-- [x] Add jurisdiction, county, and document_type fields to documents table
-- [x] Create document_versions table with appropriate fields
-- [x] Implement database triggers for versioning automation
-- [x] Create archive storage bucket for document versions
-- [x] Implement cleanup function for expired versions
+- [x] Add indexes for efficient duplicate checking and version filtering
+- [x] Add unique constraint for content_hash on latest versions
+- [x] Update existing documents with default version values
+- [ ] Add jurisdiction, county, and document_type fields to documents table
+- [ ] Create document_versions table with appropriate fields
+- [ ] Implement database triggers for versioning automation
+- [ ] Create archive storage bucket for document versions
+- [ ] Implement cleanup function for expired versions
 
 ## Security & Performance
 - [x] Set up proper CORS configurations

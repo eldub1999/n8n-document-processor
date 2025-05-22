@@ -32,6 +32,7 @@ async function checkForDuplicates(contentHash: string) {
     .select('id, filename, created_at, created_by')
     .eq('content_hash', contentHash)
     .eq('is_latest', true)
+    .not('content_hash', 'is', null) // Only check documents that have hashes
     .limit(1);
     
   if (error) {
