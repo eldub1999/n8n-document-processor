@@ -67,10 +67,28 @@ export async function uploadDocument(document: DocumentUpload): Promise<Document
       }
     });
     
+
+    
     if (functionError) {
       // Clean up temp file on function error
       await supabase.storage.from(TEMP_UPLOADS_BUCKET).remove([tempFileId]);
-      throw new Error(`Validation failed: ${functionError.message}`);
+      console.error('Edge Function error details:', functionError);
+      
+      // Check if this is a 409 conflict (duplicate detection) with response body
+      if (functionError.context?.res?.status === 409 && functionError.context?.res?.body) {
+        try {
+          const duplicateResponse = functionError.context.res.body;
+          if (duplicateResponse.errorCode === 'DUPLICATE_DOCUMENT' && duplicateResponse.duplicateFile) {
+            const duplicateInfo = duplicateResponse.duplicateFile;
+            const uploadDate = new Date(duplicateInfo.uploadedAt).toLocaleDateString();
+            throw new Error(`This document already exists in the system. Original file "${duplicateInfo.filename}" was uploaded on ${uploadDate}.`);
+          }
+        } catch (parseError) {
+          console.warn('Failed to parse duplicate response:', parseError);
+        }
+      }
+      
+      throw new Error(`Validation failed: ${functionError.message} (Code: ${functionError.code || 'unknown'})`);
     }
     
     const response: ValidationResponse = validationData;

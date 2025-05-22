@@ -19,13 +19,16 @@
 ## Phase 2: Core Feature Implementation 🚧 IN PROGRESS
 
 ### 2.1 Document Deduplication ✅ COMPLETED
-- [x] Enhanced Edge Function with SHA-256 content hashing
+- [x] Enhanced Edge Function with SHA-256 content hashing using Web Crypto API
 - [x] Implemented temp storage workflow for validation
 - [x] Added comprehensive duplicate detection and error handling
 - [x] Created temp-uploads bucket with proper RLS policies
 - [x] Integrated deduplication into frontend upload workflow
 - [x] Added user-friendly error messages for duplicate detection
-- [x] Deployed and tested Edge Function via Supabase MCP
+- [x] Fixed CORS configuration to allow Supabase apikey headers
+- [x] Fixed 409 conflict response handling for duplicate detection
+- [x] Deployed and tested Edge Function via Supabase MCP (version 14)
+- [x] Verified system works with legacy documents (graceful hash migration)
 
 ### 2.2 Document Metadata Tagging 🔜 NEXT
 - [ ] Add jurisdiction field (US states/territories + National)
