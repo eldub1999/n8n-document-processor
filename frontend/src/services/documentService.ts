@@ -2,51 +2,126 @@ import { supabase } from './supabase';
 import type { DocumentSearchParams, DocumentUpload, Document } from '../types/document';
 
 const DOCUMENTS_BUCKET = 'documents';
+const TEMP_UPLOADS_BUCKET = 'temp-uploads';
+
+// Interface for Edge Function response
+interface ValidationResponse {
+  success: boolean;
+  error?: string;
+  errorCode?: string;
+  duplicateFile?: {
+    id: string;
+    filename: string;
+    uploadedAt: string;
+    uploadedBy: string;
+  };
+  data?: {
+    contentHash: string;
+    storagePath: string;
+    filename: string;
+    size: number;
+    userId: string;
+    metadata: any;
+    isUnique: boolean;
+  };
+  requestId?: string;
+}
 
 /**
- * Upload a document to Supabase Storage and add its metadata to the database
+ * Upload a document with deduplication checking
  */
 export async function uploadDocument(document: DocumentUpload): Promise<Document> {
-  const user = supabase.auth.getUser();
-  if (!user) {
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
     throw new Error('User must be logged in to upload documents');
   }
   
   const file = document.file;
   const fileExt = file.name.split('.').pop();
-  const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-  const filePath = `${fileName}`;
+  const tempFileId = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
   
-  // Upload file to Supabase Storage
-  const { error: uploadError, data: uploadData } = await supabase.storage
-    .from(DOCUMENTS_BUCKET)
-    .upload(filePath, file);
+  try {
+    // Step 1: Upload file to temporary storage
+    const { error: tempUploadError } = await supabase.storage
+      .from(TEMP_UPLOADS_BUCKET)
+      .upload(tempFileId, file, {
+        contentType: file.type,
+        upsert: false
+      });
+      
+    if (tempUploadError) {
+      throw new Error(`Failed to upload file to temporary storage: ${tempUploadError.message}`);
+    }
     
-  if (uploadError) {
-    throw new Error(`Error uploading file: ${uploadError.message}`);
-  }
-  
-  // Create document metadata in the database
-  const { error: dbError, data: dbData } = await supabase
-    .from('documents')
-    .insert({
-      filename: file.name,
-      storage_path: filePath,
-      content_type: file.type,
-      size_bytes: file.size,
-      created_by: (await user).data.user?.id,
-      description: document.description
-    })
-    .select()
-    .single();
+    // Step 2: Call validation Edge Function with deduplication checking
+    const { data: validationData, error: functionError } = await supabase.functions.invoke('document-validation', {
+      body: {
+        fileId: tempFileId,
+        userId: user.id,
+        filename: file.name,
+        metadata: {
+          description: document.description,
+          originalSize: file.size,
+          contentType: file.type
+        }
+      }
+    });
     
-  if (dbError) {
-    // If database insert fails, try to delete the uploaded file
-    await supabase.storage.from(DOCUMENTS_BUCKET).remove([filePath]);
-    throw new Error(`Error creating document record: ${dbError.message}`);
+    if (functionError) {
+      // Clean up temp file on function error
+      await supabase.storage.from(TEMP_UPLOADS_BUCKET).remove([tempFileId]);
+      throw new Error(`Validation failed: ${functionError.message}`);
+    }
+    
+    const response: ValidationResponse = validationData;
+    
+    if (!response.success) {
+      // Clean up temp file on validation failure
+      await supabase.storage.from(TEMP_UPLOADS_BUCKET).remove([tempFileId]);
+      
+      if (response.errorCode === 'DUPLICATE_DOCUMENT' && response.duplicateFile) {
+        const duplicateInfo = response.duplicateFile;
+        const uploadDate = new Date(duplicateInfo.uploadedAt).toLocaleDateString();
+        throw new Error(`This document already exists in the system. Original file "${duplicateInfo.filename}" was uploaded on ${uploadDate}.`);
+      }
+      
+      throw new Error(response.error || 'Document validation failed');
+    }
+    
+    // Step 3: Create document metadata in database
+    if (!response.data) {
+      throw new Error('Validation succeeded but no document data returned');
+    }
+    
+    const { data: dbData, error: dbError } = await supabase
+      .from('documents')
+      .insert({
+        filename: file.name,
+        storage_path: response.data.storagePath,
+        content_type: file.type,
+        size_bytes: file.size,
+        created_by: user.id,
+        description: document.description,
+        content_hash: response.data.contentHash,
+        version: 1,
+        is_latest: true
+      })
+      .select()
+      .single();
+      
+    if (dbError) {
+      // If database insert fails, try to clean up the moved file
+      await supabase.storage.from(DOCUMENTS_BUCKET).remove([response.data.storagePath]);
+      throw new Error(`Failed to create document record: ${dbError.message}`);
+    }
+    
+    return dbData;
+    
+  } catch (error) {
+    // Ensure temp file is cleaned up on any error
+    await supabase.storage.from(TEMP_UPLOADS_BUCKET).remove([tempFileId]);
+    throw error;
   }
-  
-  return dbData;
 }
 
 /**
@@ -64,6 +139,7 @@ export async function getDocuments(params: DocumentSearchParams = {}): Promise<D
   let query = supabase
     .from('documents')
     .select('*')
+    .eq('is_latest', true) // Only show latest versions
     .order(sortBy, { ascending: sortOrder === 'asc' })
     .range(offset, offset + limit - 1);
     

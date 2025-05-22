@@ -111,11 +111,21 @@ const DocumentUpload = () => {
       navigate('/documents');
     } catch (err) {
       console.error('Error uploading document:', err);
-      setError(err instanceof Error ? err.message : 'Failed to upload document');
-      toaster.create({
-        title: 'Error',
-        description: 'Failed to upload document. Please try again.',
-      });
+      const errorMessage = err instanceof Error ? err.message : 'Failed to upload document';
+      setError(errorMessage);
+      
+      // Show different toast messages based on error type
+      if (errorMessage.includes('already exists in the system')) {
+        toaster.create({
+          title: 'Duplicate Document',
+          description: 'This document is already in the system.',
+        });
+      } else {
+        toaster.create({
+          title: 'Upload Failed',
+          description: 'Failed to upload document. Please try again.',
+        });
+      }
     } finally {
       setUploading(false);
     }
