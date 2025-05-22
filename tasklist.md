@@ -40,6 +40,9 @@
 - [x] Added database indexes for efficient metadata filtering
 - [x] Updated DocumentUpload component with interactive metadata form
 - [x] Created countyService for dynamic county data by jurisdiction
+- [x] Enhanced county selection with "All Counties" option for jurisdiction-wide documents
+- [x] Implemented explicit checkbox UX for "applies to all counties" workflow
+- [x] Added comprehensive FIPS county data for all US states and territories
 
 ---
 

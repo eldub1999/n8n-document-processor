@@ -19,6 +19,7 @@ const DocumentUpload = () => {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [appliesToAllCounties, setAppliesToAllCounties] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
@@ -121,7 +122,7 @@ const DocumentUpload = () => {
         file: selectedFile,
         description: description.trim() || undefined,
         jurisdiction: jurisdiction || undefined,
-        county: county || undefined,
+        county: appliesToAllCounties ? 'all' : county || undefined,
         document_type: documentType || undefined,
       };
       
@@ -259,32 +260,63 @@ const DocumentUpload = () => {
             </select>
           </div>
           
-          <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1">
-              County {jurisdiction === 'national' ? '(Not applicable)' : '*'}
-            </label>
-            <select 
-              className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={county}
-              onChange={(e) => setCounty(e.target.value)}
-              disabled={!jurisdiction || jurisdiction === 'national'}
-              required={jurisdiction !== 'national' && jurisdiction !== ''}
-            >
-              <option value="">
-                {!jurisdiction 
-                  ? 'Select jurisdiction first' 
-                  : jurisdiction === 'national' 
-                    ? 'Not applicable' 
-                    : 'Select a county'}
-              </option>
-              {jurisdiction && jurisdiction !== 'national' && 
-                getCountiesByJurisdiction(jurisdiction).map((cnty) => (
-                  <option key={cnty.value} value={cnty.value}>
-                    {cnty.label}
+          {/* County Field - Only show if not National */}
+          {jurisdiction !== 'national' && (
+            <div className="space-y-3">
+              {/* All Counties Checkbox */}
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="appliesToAllCounties"
+                  checked={appliesToAllCounties}
+                  onChange={(e) => {
+                    setAppliesToAllCounties(e.target.checked);
+                    if (e.target.checked) {
+                      setCounty('all');
+                    } else {
+                      setCounty('');
+                    }
+                  }}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="appliesToAllCounties" className="text-sm font-medium text-gray-700">
+                  Document applies to all counties in {US_JURISDICTIONS.find(j => j.value === jurisdiction)?.label}
+                </label>
+              </div>
+
+              {/* County Dropdown - Disabled when all counties selected */}
+              <div>
+                <label htmlFor="county" className="block text-sm font-medium text-gray-700 mb-2">
+                  County {!appliesToAllCounties && <span className="text-red-500">*</span>}
+                </label>
+                <select
+                  id="county"
+                  name="county"
+                  value={appliesToAllCounties ? 'all' : county}
+                  onChange={(e) => setCounty(e.target.value)}
+                  disabled={appliesToAllCounties}
+                  required={!appliesToAllCounties}
+                  className={`block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                    appliesToAllCounties ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''
+                  }`}
+                >
+                  <option value="">
+                    {appliesToAllCounties ? 'All Counties Selected' : 'Select a county...'}
                   </option>
-                ))}
-            </select>
-          </div>
+                  {!appliesToAllCounties && getCountiesByJurisdiction(jurisdiction).map((cnty) => (
+                    <option key={cnty.value} value={cnty.value}>
+                      {cnty.label}
+                    </option>
+                  ))}
+                </select>
+                {appliesToAllCounties && (
+                  <p className="mt-1 text-sm text-gray-500">
+                    This document will apply to all counties in the selected jurisdiction.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
           
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-zinc-700 mb-1">
