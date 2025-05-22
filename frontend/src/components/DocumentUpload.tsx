@@ -2,7 +2,9 @@ import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { uploadDocument } from '../services/documentService';
 import { toaster } from '../services/toast';
+import { getCountiesByJurisdiction, hasCountyData } from '../services/countyService';
 import type { DocumentUpload as DocumentUploadType } from '../types/document';
+import { US_JURISDICTIONS, DOCUMENT_TYPES } from '../types/document';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
@@ -11,6 +13,9 @@ const DocumentUpload = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [description, setDescription] = useState('');
+  const [jurisdiction, setJurisdiction] = useState('');
+  const [county, setCounty] = useState('');
+  const [documentType, setDocumentType] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +97,22 @@ const DocumentUpload = () => {
       return;
     }
     
+    // Validate required metadata fields
+    if (!jurisdiction) {
+      setError('Please select a jurisdiction.');
+      return;
+    }
+    
+    if (!documentType) {
+      setError('Please select a document type.');
+      return;
+    }
+    
+    if (jurisdiction !== 'national' && !county) {
+      setError('Please select a county for the selected jurisdiction.');
+      return;
+    }
+    
     try {
       setUploading(true);
       setError(null);
@@ -99,6 +120,9 @@ const DocumentUpload = () => {
       const documentData: DocumentUploadType = {
         file: selectedFile,
         description: description.trim() || undefined,
+        jurisdiction: jurisdiction || undefined,
+        county: county || undefined,
+        document_type: documentType || undefined,
       };
       
       await uploadDocument(documentData);
@@ -211,6 +235,77 @@ const DocumentUpload = () => {
           </div>
         )}
         
+        {/* Metadata Fields */}
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-zinc-700 mb-1">
+              Jurisdiction *
+            </label>
+            <select 
+              className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={jurisdiction}
+              onChange={(e) => {
+                setJurisdiction(e.target.value);
+                setCounty(''); // Reset county when jurisdiction changes
+              }}
+              required
+            >
+              <option value="">Select a jurisdiction</option>
+              {US_JURISDICTIONS.map((jur) => (
+                <option key={jur.value} value={jur.value}>
+                  {jur.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-zinc-700 mb-1">
+              County {jurisdiction === 'national' ? '(Not applicable)' : '*'}
+            </label>
+            <select 
+              className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={county}
+              onChange={(e) => setCounty(e.target.value)}
+              disabled={!jurisdiction || jurisdiction === 'national'}
+              required={jurisdiction !== 'national' && jurisdiction !== ''}
+            >
+              <option value="">
+                {!jurisdiction 
+                  ? 'Select jurisdiction first' 
+                  : jurisdiction === 'national' 
+                    ? 'Not applicable' 
+                    : 'Select a county'}
+              </option>
+              {jurisdiction && jurisdiction !== 'national' && 
+                getCountiesByJurisdiction(jurisdiction).map((cnty) => (
+                  <option key={cnty.value} value={cnty.value}>
+                    {cnty.label}
+                  </option>
+                ))}
+            </select>
+          </div>
+          
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-zinc-700 mb-1">
+              Document Type *
+            </label>
+            <select 
+              className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={documentType}
+              onChange={(e) => setDocumentType(e.target.value)}
+              required
+            >
+              <option value="">Select a document type</option>
+              {DOCUMENT_TYPES.map((type) => (
+                <option key={type.value} value={type.value}>
+                  {type.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         <div className="mt-6">
           <label className="block text-sm font-medium text-zinc-700 mb-1">
             Description (Optional)

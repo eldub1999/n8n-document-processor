@@ -30,12 +30,16 @@
 - [x] Deployed and tested Edge Function via Supabase MCP (version 14)
 - [x] Verified system works with legacy documents (graceful hash migration)
 
-### 2.2 Document Metadata Tagging 🔜 NEXT
-- [ ] Add jurisdiction field (US states/territories + National)
-- [ ] Add dynamic county selection based on jurisdiction
-- [ ] Add document type categorization (Real Estate Law, Title & Escrow Law, Tax Law, Regulation)
-- [ ] Update upload UI to include metadata fields
-- [ ] Implement filtering by metadata in document list
+### 2.2 Document Metadata Tagging ✅ COMPLETED  
+- [x] Added jurisdiction field (US states/territories + National)
+- [x] Added dynamic county selection based on jurisdiction via countyService  
+- [x] Added document type categorization (Real Estate Law, Title & Escrow Law, Tax Law, Regulation)
+- [x] Updated upload UI to include required metadata fields with validation
+- [x] Implemented filtering by metadata in document list service
+- [x] Created database migration adding jurisdiction, county, and document_type columns
+- [x] Added database indexes for efficient metadata filtering
+- [x] Updated DocumentUpload component with interactive metadata form
+- [x] Created countyService for dynamic county data by jurisdiction
 
 ---
 

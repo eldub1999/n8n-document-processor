@@ -122,7 +122,10 @@ export async function uploadDocument(document: DocumentUpload): Promise<Document
         description: document.description,
         content_hash: response.data.contentHash,
         version: 1,
-        is_latest: true
+        is_latest: true,
+        jurisdiction: document.jurisdiction,
+        county: document.county,
+        document_type: document.document_type
       })
       .select()
       .single();
@@ -151,7 +154,10 @@ export async function getDocuments(params: DocumentSearchParams = {}): Promise<D
     sortOrder = 'desc',
     limit = 20,
     offset = 0,
-    filterText = '' 
+    filterText = '',
+    jurisdiction,
+    county,
+    document_type
   } = params;
   
   let query = supabase
@@ -163,6 +169,19 @@ export async function getDocuments(params: DocumentSearchParams = {}): Promise<D
     
   if (filterText) {
     query = query.ilike('filename', `%${filterText}%`);
+  }
+  
+  // Add metadata filters
+  if (jurisdiction) {
+    query = query.eq('jurisdiction', jurisdiction);
+  }
+  
+  if (county) {
+    query = query.eq('county', county);
+  }
+  
+  if (document_type) {
+    query = query.eq('document_type', document_type);
   }
   
   const { data, error } = await query;
