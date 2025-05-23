@@ -15,6 +15,7 @@ interface RAGQueryRequest {
   jurisdictions?: string[];
   documentTypes?: string[];
   maxResults?: number;
+  generateEmbeddingOnly?: boolean;
 }
 
 interface RAGQueryResponse {
@@ -51,12 +52,12 @@ async function semanticSearch(
   supabase: any, 
   jurisdictions?: string[],
   documentTypes?: string[],
-  maxResults: number = 10
+  maxResults: number = 10,
+  generateEmbeddingOnly: boolean = false
 ) {
   try {
     console.log('🔍 Performing semantic search with filters:', { jurisdictions, documentTypes });
     
-    // Generate embedding for the query using Voyage AI (FIXED: corrected API key name)
     const voyageApiKey = await getApiKey('voyage_ai_api_key');
     
     const embeddingResponse = await fetch('https://api.voyageai.com/v1/embeddings', {
@@ -77,6 +78,10 @@ async function semanticSearch(
     
     const embeddingData = await embeddingResponse.json();
     const queryEmbedding = embeddingData.data[0].embedding;
+
+    if (generateEmbeddingOnly) {
+      return { embedding: queryEmbedding, sources: [] };
+    }
     
     // Perform vector similarity search with metadata filters
     // TODO: Ensure the 'search_similar_embeddings' RPC can handle these new filters
@@ -111,7 +116,7 @@ async function semanticSearch(
     })) || [];
     
     console.log(`✅ Found ${transformedResults.length} relevant chunks`);
-    return transformedResults;
+    return { embedding: queryEmbedding, sources: transformedResults };
     
   } catch (error) {
     console.error('Semantic search failed:', error);
@@ -418,7 +423,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { query, conversationId, jurisdictions, documentTypes, maxResults }: RAGQueryRequest = await req.json();
+    const { query, conversationId, jurisdictions, documentTypes, maxResults, generateEmbeddingOnly }: RAGQueryRequest = await req.json();
 
     if (!query?.trim()) {
       throw new Error('Query is required');
@@ -426,32 +431,60 @@ serve(async (req) => {
 
     console.log('🚀 Processing RAG query:', query);
     console.log('📍 Filters:', { jurisdictions, documentTypes });
+    console.log('💡 Embedding Only Mode:', generateEmbeddingOnly);
 
-    // Perform semantic search with metadata filtering
+    const { projectId } = await getGoogleCloudCredentials(); 
+
+    // If only embedding is requested, get it and return
+    if (generateEmbeddingOnly) {
+      const voyageApiKey = await getApiKey('voyage_ai_api_key');
+      const embeddingResponse = await fetch('https://api.voyageai.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${voyageApiKey}`,
+        },
+        body: JSON.stringify({
+          input: [query],
+          model: 'voyage-3-large'
+        })
+      });
+      if (!embeddingResponse.ok) {
+        throw new Error(`Voyage AI embedding failed (direct request): ${embeddingResponse.status}`);
+      }
+      const embeddingData = await embeddingResponse.json();
+      const queryEmbedding = embeddingData.data[0].embedding;
+      
+      return new Response(JSON.stringify({ success: true, embedding: queryEmbedding }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const searchResults = await semanticSearch(
       query,
       supabase,
       jurisdictions,
       documentTypes,
-      maxResults || 10
+      maxResults || 10,
+      generateEmbeddingOnly
     );
 
     // Generate response using LLM (now Gemini for testing)
-    const llmResponse = await generateLLMResponse_GeminiTest(query, searchResults);
+    const llmResponse = await generateLLMResponse_GeminiTest(query, searchResults.sources);
 
     // Store conversation
     const finalConversationId = await storeConversation(
       supabase,
       query,
       llmResponse,
-      searchResults,
+      searchResults.sources,
       conversationId
     );
 
     const result: RAGQueryResponse = {
       success: true,
       response: llmResponse,
-      sources: searchResults.map(chunk => ({
+      sources: searchResults.sources.map(chunk => ({
         document_id: chunk.document_id || chunk.documents?.id,
         filename: chunk.documents?.filename || chunk.document?.filename,
         jurisdiction: chunk.documents?.jurisdiction || chunk.document?.jurisdiction,
@@ -461,7 +494,7 @@ serve(async (req) => {
         chunk_index: chunk.chunk_index
       })),
       conversationId: finalConversationId,
-      details: `Processed with Gemini 1.5 Flash. Found ${searchResults.length} relevant sources.`
+      details: `Processed with Gemini 1.5 Flash. Found ${searchResults.sources.length} relevant sources.`
     };
 
     return new Response(JSON.stringify(result), {
