@@ -295,219 +295,272 @@ const DocumentUpload = () => {
         )}
         
         {/* Metadata Fields */}
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1">
-              Jurisdiction *
-            </label>
-            <select 
-              className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={jurisdiction}
-              onChange={(e) => {
-                setJurisdiction(e.target.value);
-                setSelectedCounties([]);
-              }}
-              required
-            >
-              <option value="">Select a jurisdiction</option>
-              {US_JURISDICTIONS.map((jur) => (
-                <option key={jur.value} value={jur.value}>
-                  {jur.label}
-                </option>
-              ))}
-            </select>
+        <div className="mt-6 space-y-6">
+          {/* Row 1: Jurisdiction and Document Type - Always side by side on desktop */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label htmlFor="jurisdiction" className="block text-sm font-medium text-gray-700">
+                Jurisdiction <span className="text-red-500">*</span>
+              </label>
+              <select 
+                id="jurisdiction"
+                name="jurisdiction"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                value={jurisdiction}
+                onChange={(e) => {
+                  setJurisdiction(e.target.value);
+                  setSelectedCounties([]);
+                }}
+                required
+              >
+                <option value="">Select a jurisdiction</option>
+                {US_JURISDICTIONS.map((jur) => (
+                  <option key={jur.value} value={jur.value}>
+                    {jur.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="space-y-2">
+              <label htmlFor="documentType" className="block text-sm font-medium text-gray-700">
+                Document Type <span className="text-red-500">*</span>
+              </label>
+              <select 
+                id="documentType"
+                name="documentType"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                value={documentType}
+                onChange={(e) => setDocumentType(e.target.value)}
+                required
+              >
+                <option value="">Select a document type</option>
+                {DOCUMENT_TYPES.map((type) => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
           
-          {/* County Field - Only show if not National */}
+          {/* Row 2: County Selection - Full width when shown */}
           {jurisdiction !== 'national' && availableCounties.length > 0 && (
-            <div className="space-y-3">
-              {/* Select All Counties Checkbox */}
-              <div className="flex items-center space-x-2">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Counties <span className="text-red-500">*</span>
+                </label>
+                <p className="text-sm text-gray-500">
+                  Select the counties where this document applies
+                </p>
+              </div>
+              
+              {/* Select All Counties Option */}
+              <div className="flex items-start space-x-3 p-3 bg-gray-50 rounded-md border border-gray-200">
                 <input
                   type="checkbox"
                   id="selectAllCounties"
                   checked={allCountiesSelected}
                   onChange={(e) => handleSelectAllCounties(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="mt-0.5 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
-                <label htmlFor="selectAllCounties" className="text-sm font-medium text-gray-700">
-                  Select all counties in {US_JURISDICTIONS.find(j => j.value === jurisdiction)?.label}
-                </label>
+                <div className="flex-1">
+                  <label htmlFor="selectAllCounties" className="text-sm font-medium text-gray-900 cursor-pointer">
+                    Apply to all counties in {US_JURISDICTIONS.find(j => j.value === jurisdiction)?.label}
+                  </label>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Check this for state-wide regulations and laws
+                  </p>
+                </div>
               </div>
 
-              {/* Custom Multiselect Dropdown */}
-              <div className="relative" ref={countyDropdownRef}>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Counties <span className="text-red-500">*</span>
-                </label>
-                
-                {/* Dropdown Button */}
-                <button
-                  type="button"
-                  onClick={() => setCountyDropdownOpen(!countyDropdownOpen)}
-                  className="w-full px-3 py-2 text-left border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                  aria-haspopup="listbox"
-                  aria-expanded={countyDropdownOpen}
-                >
-                  <span className="block truncate text-gray-900">
-                    {getSelectedCountiesText()}
-                  </span>
-                  <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                    <svg 
-                      className={`h-5 w-5 text-gray-400 transform transition-transform ${countyDropdownOpen ? 'rotate-180' : ''}`} 
-                      viewBox="0 0 20 20" 
-                      fill="currentColor"
+              {/* Individual County Selection */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-700">Or select specific counties:</span>
+                  {selectedCounties.length > 0 && !allCountiesSelected && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCounties([])}
+                      className="text-xs text-gray-500 hover:text-gray-700 underline"
                     >
-                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                  </span>
-                </button>
-
-                {/* Dropdown Options */}
-                {countyDropdownOpen && (
-                  <div className="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none">
-                    <div className="px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide border-b border-gray-200">
-                      Select Counties ({selectedCounties.length} selected)
-                    </div>
-                    
-                    {availableCounties.map((county) => {
-                      const isSelected = selectedCounties.includes(county.value);
-                      return (
-                        <label
-                          key={county.value}
-                          className="flex items-center px-3 py-2 hover:bg-blue-50 cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={(e) => handleCountyChange(county.value, e.target.checked)}
-                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mr-3"
-                          />
-                          <span className={`text-sm ${isSelected ? 'font-medium text-blue-900' : 'text-gray-900'}`}>
-                            {county.label}
-                          </span>
-                          {isSelected && (
-                            <svg className="ml-auto h-4 w-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                          )}
-                        </label>
-                      );
-                    })}
-                    
-                    {/* Dropdown Actions */}
-                    <div className="border-t border-gray-200 px-3 py-2 flex justify-between items-center bg-gray-50">
-                      <span className="text-xs text-gray-500">
-                        {selectedCounties.length} of {availableCounties.length} selected
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setCountyDropdownOpen(false)}
-                        className="text-xs font-medium text-blue-600 hover:text-blue-500"
-                      >
-                        Done
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Selected Counties Display */}
-                {selectedCounties.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {selectedCounties.map((countyValue) => {
-                      const county = availableCounties.find(c => c.value === countyValue);
-                      return (
-                        <span
-                          key={countyValue}
-                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                        >
-                          {county?.label || countyValue}
-                          <button
-                            type="button"
-                            onClick={() => handleCountyChange(countyValue, false)}
-                            className="ml-1.5 h-4 w-4 rounded-full inline-flex items-center justify-center text-blue-400 hover:bg-blue-200 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            aria-label={`Remove ${county?.label || countyValue}`}
-                          >
-                            <svg className="h-2 w-2" stroke="currentColor" fill="none" viewBox="0 0 8 8">
-                              <path strokeLinecap="round" strokeWidth="1.5" d="m1 1 6 6m0-6L1 7" />
-                            </svg>
-                          </button>
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Clear All Button */}
-                {selectedCounties.length > 0 && (
+                      Clear all
+                    </button>
+                  )}
+                </div>
+                
+                {/* Custom Multiselect Dropdown */}
+                <div className="relative" ref={countyDropdownRef}>
                   <button
                     type="button"
-                    onClick={() => setSelectedCounties([])}
-                    className="mt-2 text-xs text-gray-500 hover:text-gray-700 underline"
+                    onClick={() => setCountyDropdownOpen(!countyDropdownOpen)}
+                    disabled={allCountiesSelected}
+                    className={`w-full px-3 py-2 text-left border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                      allCountiesSelected 
+                        ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed' 
+                        : 'bg-white border-gray-300 text-gray-900 hover:border-gray-400'
+                    }`}
+                    aria-haspopup="listbox"
+                    aria-expanded={countyDropdownOpen}
                   >
-                    Clear all selections
+                    <span className="block truncate">
+                      {allCountiesSelected 
+                        ? `All counties selected (${availableCounties.length})`
+                        : getSelectedCountiesText()
+                      }
+                    </span>
+                    <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                      <svg 
+                        className={`h-5 w-5 text-gray-400 transform transition-transform ${countyDropdownOpen ? 'rotate-180' : ''}`} 
+                        viewBox="0 0 20 20" 
+                        fill="currentColor"
+                      >
+                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </span>
                   </button>
+
+                  {/* Dropdown Options */}
+                  {countyDropdownOpen && !allCountiesSelected && (
+                    <div className="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none">
+                      <div className="px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide border-b border-gray-200">
+                        Select Counties ({selectedCounties.length} selected)
+                      </div>
+                      
+                      {availableCounties.map((county) => {
+                        const isSelected = selectedCounties.includes(county.value);
+                        return (
+                          <label
+                            key={county.value}
+                            className="flex items-center px-3 py-2 hover:bg-blue-50 cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) => handleCountyChange(county.value, e.target.checked)}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mr-3"
+                            />
+                            <span className={`text-sm flex-1 ${isSelected ? 'font-medium text-blue-900' : 'text-gray-900'}`}>
+                              {county.label}
+                            </span>
+                            {isSelected && (
+                              <svg className="h-4 w-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            )}
+                          </label>
+                        );
+                      })}
+                      
+                      {/* Dropdown Actions */}
+                      <div className="border-t border-gray-200 px-3 py-2 flex justify-between items-center bg-gray-50">
+                        <span className="text-xs text-gray-500">
+                          {selectedCounties.length} of {availableCounties.length} selected
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setCountyDropdownOpen(false)}
+                          className="text-xs font-medium text-blue-600 hover:text-blue-500"
+                        >
+                          Done
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Selected Counties Display */}
+                {selectedCounties.length > 0 && !allCountiesSelected && (
+                  <div className="mt-3 p-3 bg-blue-50 rounded-md border border-blue-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-blue-900">
+                        Selected Counties ({selectedCounties.length})
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedCounties.map((countyValue) => {
+                        const county = availableCounties.find(c => c.value === countyValue);
+                        return (
+                          <span
+                            key={countyValue}
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-300"
+                          >
+                            {county?.label || countyValue}
+                            <button
+                              type="button"
+                              onClick={() => handleCountyChange(countyValue, false)}
+                              className="ml-1.5 h-4 w-4 rounded-full inline-flex items-center justify-center text-blue-400 hover:bg-blue-200 hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              aria-label={`Remove ${county?.label || countyValue}`}
+                            >
+                              <svg className="h-2 w-2" stroke="currentColor" fill="none" viewBox="0 0 8 8">
+                                <path strokeLinecap="round" strokeWidth="1.5" d="m1 1 6 6m0-6L1 7" />
+                              </svg>
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
                 )}
 
                 {/* Validation Message */}
-                {selectedCounties.length === 0 && (
-                  <p className="mt-1 text-sm text-gray-500">
-                    Please select at least one county for this jurisdiction.
+                {selectedCounties.length === 0 && !allCountiesSelected && (
+                  <p className="mt-2 text-sm text-gray-500">
+                    Please select at least one county or choose "Apply to all counties"
                   </p>
                 )}
               </div>
             </div>
           )}
           
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-zinc-700 mb-1">
-              Document Type *
+          {/* Row 3: Description - Full width */}
+          <div className="space-y-2">
+            <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+              Description <span className="text-gray-400">(Optional)</span>
             </label>
-            <select 
-              className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={documentType}
-              onChange={(e) => setDocumentType(e.target.value)}
-              required
-            >
-              <option value="">Select a document type</option>
-              {DOCUMENT_TYPES.map((type) => (
-                <option key={type.value} value={type.value}>
-                  {type.label}
-                </option>
-              ))}
-            </select>
+            <textarea 
+              id="description"
+              name="description"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              rows={3}
+              placeholder="Add a description for this document..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+            <p className="text-xs text-gray-500">
+              Provide context about this document, its purpose, or relevant details
+            </p>
           </div>
         </div>
-
-        <div className="mt-6">
-          <label className="block text-sm font-medium text-zinc-700 mb-1">
-            Description (Optional)
-          </label>
-          <textarea 
-            className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            rows={3}
-            placeholder="Add a description for this document"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </div>
         
-        <div className="mt-6 flex justify-end">
+        <div className="mt-8 flex flex-col sm:flex-row sm:justify-end gap-3">
           <button
             type="button"
-            className="mr-4 px-4 py-2 text-zinc-600 border border-zinc-300 rounded-md hover:bg-zinc-50 transition-colors"
+            className="w-full sm:w-auto px-6 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
             onClick={() => navigate('/documents')}
           >
             Cancel
           </button>
           <button
             type="button"
-            className={`px-6 py-2 bg-blue-600 text-white rounded-md transition-colors
-              ${!selectedFile || uploading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'}`}
+            className={`w-full sm:w-auto px-6 py-2.5 bg-blue-600 text-white rounded-md shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+              !selectedFile || uploading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'
+            }`}
             disabled={!selectedFile || uploading}
             onClick={handleUpload}
           >
-            {uploading ? 'Uploading...' : 'Upload Document'}
+            {uploading ? (
+              <span className="flex items-center">
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Uploading...
+              </span>
+            ) : (
+              'Upload Document'
+            )}
           </button>
         </div>
       </div>
