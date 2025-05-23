@@ -150,19 +150,6 @@ const binaryKey = atob(keyData); // Or equivalent fix for service account key ha
 
 ---
 
-## 🔥 **IMMEDIATE NEXT STEPS (THIS SESSION)**
-
-**PRIMARY GOAL**: Conduct a full end-to-end system test starting from a completely clean data state to validate the stability and correctness of the entire workflow, especially the `rag-chat` v7 Edge Function. **CURRENTLY PAUSED due to document processing not initiating.**
-
-**PRIORITY ACTIONS (WHEN RESUMED)**:
-1. **❗ Verify/Fix Supabase Storage trigger for `document-validation` function.**
-2. **❗ Re-attempt document upload.**
-3. **❗ Monitor document processing (ensure `document_processing_status` is updated).**
-4. **❗ Test RAG functionality with the new documents.**
-5. **🧹 Clean Up Edge Functions (after RAG stability confirmed by this test).**
-
----
-
 ## ✅ COMPLETED TASKS (VERIFIED - CODE LEVEL)
 
 ### **Infrastructure & Authentication ✅**
@@ -406,5 +393,26 @@ const binaryKey = atob(keyData); // Or equivalent fix for service account key ha
 - **Vector Search**: pgvector similarity search using query embeddings
 - **Fallback**: Text search backup if embedding generation fails
 - **✅ EMBEDDING CONSISTENCY**: Both documents and queries use `voyage-3-large`
+
+---
+
+## 📝 DOCUMENTATION NOTE (IMPORTANT)
+
+**With the new documentation structure (`document_index.md`, `ARCHITECTURE.md`, `BACKEND_GUIDE.md`, `FRONTEND_GUIDE.md`), please ensure that any permanent architectural insights, stable component descriptions, or resolved design decisions are moved from this `tasklist.md` into the appropriate static documentation files.**
+
+This `tasklist.md` should remain focused on dynamic operational tasks, active bug tracking, current system status, and immediate next steps. Avoid letting it become a long-term knowledge silo for information better suited to the more permanent guides. Link to the relevant sections in the static docs from here if needed for context on a task.
+
+---
+
+## 🔥 **IMMEDIATE NEXT STEPS (THIS SESSION)**
+
+**PRIMARY GOAL**: Conduct a full end-to-end system test starting from a completely clean data state to validate the stability and correctness of the entire workflow, especially the `rag-chat` v7 Edge Function. **CURRENTLY PAUSED due to document processing not initiating.**
+
+**PRIORITY ACTIONS (WHEN RESUMED)**:
+1. **❗ Verify/Fix Supabase Storage trigger for `document-validation` function.**
+2. **❗ Re-attempt document upload.**
+3. **❗ Monitor document processing (ensure `document_processing_status` is updated).**
+4. **❗ Test RAG functionality with the new documents.**
+5. **🧹 Clean Up Edge Functions (after RAG stability confirmed by this test).**
 
 ---
