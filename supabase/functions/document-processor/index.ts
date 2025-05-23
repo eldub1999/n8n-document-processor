@@ -636,6 +636,28 @@ async function processDocument(documentId: string): Promise<void> {
       throw new Error('No text content found in document');
     }
     
+    // Store the full RAG-optimized markdown
+    try {
+      const { error: markdownStoreError } = await supabase
+        .from('processed_markdown_documents') // ASSUMPTION: This table exists
+        .insert({
+          document_id: documentId,
+          markdown_content: text,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+      if (markdownStoreError) {
+        // Log error but attempt to continue processing with the extracted text
+        console.warn(`[${documentId}] Failed to store full markdown: ${markdownStoreError.message}. Proceeding with in-memory text.`);
+        // Optionally, you could re-throw if storing full markdown is critical:
+        // throw new Error(`Failed to store full markdown: ${markdownStoreError.message}`);
+      } else {
+        console.log(`[${documentId}] Full markdown stored successfully.`);
+      }
+    } catch (e) {
+      console.warn(`[${documentId}] Exception storing full markdown: ${e.message}. Proceeding with in-memory text.`);
+    }
+
     const textTokens = countTokens(text);
     console.log(`Extracted ${text.length} characters (~${textTokens} tokens) from ${document.filename}`);
     

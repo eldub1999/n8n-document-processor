@@ -1,25 +1,28 @@
 # Task List - Legal Document Management System
 
-## Status: 🔧 COMPREHENSIVE SYSTEM AUDIT COMPLETE - READY FOR FINAL FIXES
+## Status: ⏸️ FULL SYSTEM TEST PAUSED (`rag-chat` v7) - Investigating Document Processing Trigger
 
 ### **SYSTEM AUDIT SUMMARY** 
 
-**✅ CORE FUNCTIONALITY STATUS:**
-- **Document Upload**: ✅ Working (2 documents successfully uploaded)
-- **Document Processing**: ✅ Working (Vertex AI + Gemini 2.0 Flash)
-- **Text Extraction**: ✅ Working (High-quality markdown output from PDFs)
-- **Embeddings Generation**: ✅ Working (28 total embeddings created with VoyageAI)
-- **Vector Storage**: ✅ Working (Stored in Supabase with pgvector)
-- **❌ RAG CHAT INTERFACE**: BROKEN - Critical bugs identified and documented
+**🔄 CURRENT STATE: DATA CLEARED - UPLOAD ATTEMPTED, PROCESSING STALLED**
+- **Document Upload**: ✅ User uploaded 1 document. Record created in `documents` table.
+- **Document Processing**: ⚠️ STALLED. No record created in `document_processing_status`.
+- **Root Cause Suspicion**: `document-validation` Edge Function may not be triggered by Supabase Storage upload.
+- **Edge Function Logs**: Showed no activity for `document-validation` or `document-processor` after upload attempt.
 
-**🔍 COMPREHENSIVE AUDIT FINDINGS:**
+**🗑️ DATA RESET COMPLETED:**
+- All relevant database tables (`documents`, `document_embeddings`, `processed_markdown_documents`, `chat_messages`, `chat_conversations`) have been truncated.
+- Supabase Storage buckets (`documents`, `temp-uploads`) have been manually cleared by the user.
+
+**🔍 COMPREHENSIVE AUDIT FINDINGS (Prior to Reset):** 
+[Previous audit findings remain for historical context but are not relevant to current clean state]
 
 ### **1. EDGE FUNCTIONS ANALYSIS - CLEANUP REQUIRED**
 **CURRENT STATE**: 13 Edge Functions deployed (excessive redundancy)
 
 **✅ CORE FUNCTIONS (KEEP - 3 functions):**
 - ✅ `document-processor` (v8) - Working correctly, handles full document processing pipeline
-- ❌ `rag-chat` (v6) - Has critical bugs but is the main RAG function 
+- ⚠️ `rag-chat` (v7) - Critical bug fixes deployed, pending full E2E testing.
 - ⚠️ `document-validation` (v14) - Optional but useful for file validation
 
 **🗑️ REDUNDANT FUNCTIONS (REMOVE - 10 functions):**
@@ -34,106 +37,133 @@
 - `simple-rag-test` (v1) - Test function, no longer needed
 - `test-vertex-auth` (v2) - Test function, no longer needed
 
-### **2. CRITICAL BUGS IDENTIFIED IN RAG-CHAT FUNCTION**
+### **2. CRITICAL BUGS IDENTIFIED IN RAG-CHAT FUNCTION (CODE FIXES APPLIED - PENDING DEPLOYMENT VERIFICATION)**
 
-#### **🚨 Bug #1: API Key Name Mismatch (CRITICAL)**
+#### **✅ Bug #1: API Key Name Mismatch**
 ```typescript
-// WRONG in rag-chat function line ~47:
-const voyageApiKey = await getApiKey('voyage_api_key');
-// SHOULD BE:
+// FIXED in supabase/functions/rag-chat/index.ts:
 const voyageApiKey = await getApiKey('voyage_ai_api_key');
 ```
-**Impact**: Prevents embedding generation → Forces text search fallback → "Query Failed" errors
 
-#### **🚨 Bug #2: Similarity Threshold Too High**
+#### **✅ Bug #2: Similarity Threshold Too High**
 ```typescript
-// CURRENT in rag-chat function:
-match_threshold: 0.7  // Too restrictive for legal documents
-// SHOULD BE:
-match_threshold: 0.5  // Based on debug analysis showing 0.5-0.7 range
+// FIXED in supabase/functions/rag-chat/index.ts (and DB function):
+match_threshold: 0.5
 ```
-**Impact**: Vector search returns 0 results even with relevant content
 
-#### **🚨 Bug #3: Base64 Decoding Error in Google Cloud Auth**
+#### **✅ Bug #3: Base64 Decoding Error in Google Cloud Auth**
 ```typescript
-// WRONG in rag-chat function:
-const binaryKey = Deno.atob(keyData);
-// SHOULD BE:
-const binaryKey = atob(keyData);
+// FIXED in supabase/functions/rag-chat/index.ts:
+const binaryKey = atob(keyData); // Or equivalent fix for service account key handling
 ```
-**Impact**: Google Cloud authentication fails → Claude response generation fails
+**Impact Note**: Fixes for these, plus dynamic Project ID for Vertex AI, and search result transformation issues, have been deployed in `rag-chat` v7. Testing is now required on a clean data set.
 
 ### **3. DATA VERIFICATION ✅**
-- **28 embeddings** in database from 2 documents (Arizona legal content)
-- **High-quality chunks** averaging ~743 tokens each
-- **Text search works** when tested directly on database
-- **Documents contain relevant legal content** for escrow rates, title agency procedures
+- **Previous Data**: 28 embeddings from 2 documents (Arizona legal content). This data has now been cleared.
+- **Current Data**: No documents or embeddings present. System is ready for new data.
 
 ---
 
 ## 🛠️ **COMPREHENSIVE FIX PLAN**
 
-### **🔥 PHASE 1: CRITICAL BUG FIXES (IMMEDIATE - THIS SESSION)**
+### **🚀 PHASE 1: FULL SYSTEM TEST & VALIDATION (FROM CLEAN SLATE) - PAUSED**
 
-1. **✅ TODO: Fix API Key Name in rag-chat Function**
-   - Update `voyage_api_key` → `voyage_ai_api_key` in rag-chat function
-   - Deploy updated function and test embedding generation
+1.  **✅ DATA CLEARED**: All database tables related to documents, embeddings, and chats have been truncated. Supabase Storage buckets (`documents`, `temp-uploads`) confirmed cleared by user.
 
-2. **✅ TODO: Fix Similarity Threshold**
-   - Lower threshold from 0.7 to 0.5 for better recall
-   - Test with actual legal queries
+2.  **⏸️ PAUSED: Full System Test - Document Upload & Processing (1 document uploaded)**
+    *   **Action**: User uploaded one document (`2001141_SCTitleAgencyLLC_10012024_RF.pdf`, ID `0bde63ea-9f03-4bbc-922b-57a3d266875d`).
+    *   **Observation**:
+        *   Frontend logged successful upload and `documents` table record creation.
+        *   UI stuck on "AI Processing Initializing".
+        *   No record found in `document_processing_status` for the uploaded document.
+        *   Supabase Edge Function logs showed no invocations for `document-validation` or `document-processor` in the relevant timeframe.
+    *   **Current Hypothesis**: The Supabase Storage trigger for invoking `document-validation` upon new file uploads is missing, misconfigured, or not firing. This prevents the processing pipeline from starting and no `document_processing_status` record is created.
+    *   **Next Step (When Resumed)**: Verify and fix Supabase Storage trigger for `document-validation`. Then re-attempt document upload.
+    *   **Verify (Backend) - Original Plan (When Resumed)**:
+        *   `documents` table: Entries for the 1 new document.
+        *   `document_processing_status` table: Status updates reflect successful processing.
+        *   `processed_markdown_documents` table: Full RAG-optimized markdown stored for the document.
+        *   `document_embeddings` table: Chunks and embeddings created for the document.
 
-3. **✅ TODO: Fix Base64 Decoding**
-   - Change `Deno.atob` to `atob` for proper Google Cloud authentication
-   - Test Claude response generation
+3.  **❗ PRIORITY TODO: Full System Test - RAG Chat Functionality (`rag-chat` v7)**
+    *   **Goal**: Test complete flow: Query → Embedding → Vector Search → LLM Response with new documents.
+    *   **Actions**:
+        *   Ask specific questions targeting the newly uploaded document.
+        *   Ask questions that may require information from the document.
+        *   Test with and without jurisdiction and document type filters.
+    *   **Verify**:
+        *   Relevant and accurate responses from Claude 3 Sonnet (via Vertex AI).
+        *   No 404 errors from the LLM API.
+        *   Source attribution in chat responses is correct and includes metadata (`filename`, `jurisdiction`, `document_type`).
+        *   Browser console and Supabase function logs are clean of unexpected errors.
 
-4. **✅ TODO: End-to-End RAG Testing**
-   - Test complete flow: Query → Embedding → Vector Search → Claude Response
-   - Verify with legal queries like "Arizona escrow rates"
+### **PREVIOUSLY COMPLETED PHASES (Historical Context)**
 
-### **🧹 PHASE 2: CLEANUP & OPTIMIZATION (NEXT SESSION)**
+*   **✅ `rag-chat` Edge Function Fixes Deployed (v7)** (Details of fixes remain relevant but are now part of the system being tested)
+*   **✅ FRONTEND REFINEMENTS (COMPLETED)** (These UI elements will be used in the current test)
 
-5. **✅ TODO: Remove Redundant Edge Functions**
-   - Delete 10 unused/redundant functions identified above
-   - Keep only the 3 core functions needed for production
 
-6. **✅ TODO: Frontend Integration Verification**
-   - Ensure Chat.tsx is calling the correct rag-chat function
-   - Verify error handling and user feedback
+### **🧹 PHASE 2: CLEANUP & OPTIMIZATION (NEXT - AFTER SYSTEM TEST VALIDATES `rag-chat` STABILITY)**
+
+14. **TODO: Remove Redundant Edge Functions** 
+    - Delete 10 unused/redundant functions identified.
+    - Keep only 3 core functions (`document-processor`, `rag-chat`, `document-validation`).
+
+15. **TODO: Frontend Integration Verification & Testing**
+    - Thoroughly test `Chat.tsx` functionality (filters, conversation flow, error handling).
+    - Verify document list loading and metadata display.
+    - Address any UI/UX issues arising from recent changes.
 
 ### **📈 PHASE 3: ENHANCEMENT & MONITORING (FUTURE)**
 
-7. **✅ TODO: Performance Monitoring**
+16. **TODO: Performance Monitoring**
    - Add logging for response times and success rates
    - Monitor embedding generation and vector search performance
 
-8. **✅ TODO: Advanced Features**
+17. **TODO: Advanced Features**
    - Document categorization by jurisdiction/type
    - Enhanced search filters
    - Bulk processing capabilities
+
+### **🏛️ PHASE 4: IMPLEMENT AI SERVICE MODULARITY & CONFIGURATION (ROADMAP)**
+
+18. **TODO: Design Database Schema for AI Service Configurations**
+    *   Store provider, model, API key reference (e.g., vault secret name) for each AI step:
+        *   RAG-Optimized Markdown Generation
+        *   Embedding Generation
+        *   Reranking (Future)
+        *   LLM Response Generation
+
+19. **TODO: Develop Frontend UI for AI Configuration Management**
+    *   Allow admin users to select and manage AI service configurations for each step.
+
+20. **TODO: Define API Adapter Interfaces**
+    *   Create TypeScript interfaces (e.g., `IMarkdownGenerator`, `IEmbeddingProvider`, `ILLMProvider`, `IRerankerProvider`).
+
+21. **TODO: Implement Concrete AI Service Adapter Classes**
+    *   Develop initial adapter classes for currently used services (e.g., `VertexAIAdapter`, `VoyageAIAdapter`) and plan for others (e.g., `AnthropicDirectAdapter`, `OpenAIAdapter`).
+
+22. **TODO: Refactor Edge Functions for Dynamic Adapter Loading**
+    *   Modify `document-processor` and `rag-chat` to:
+        *   Read the active AI service configuration from the database.
+        *   Dynamically instantiate and use the appropriate adapter based on the configuration.
 
 ---
 
 ## 🔥 **IMMEDIATE NEXT STEPS (THIS SESSION)**
 
-**PRIMARY ISSUE**: Multiple critical bugs in rag-chat function preventing RAG functionality
+**PRIMARY GOAL**: Conduct a full end-to-end system test starting from a completely clean data state to validate the stability and correctness of the entire workflow, especially the `rag-chat` v7 Edge Function. **CURRENTLY PAUSED due to document processing not initiating.**
 
-**EVIDENCE FROM AUDIT**: 
-- API key name mismatch causes embedding generation to fail
-- High similarity threshold (0.7) returns 0 results even with relevant content  
-- Base64 decoding error prevents Claude authentication
-- System has good foundation but these bugs break the entire RAG pipeline
-
-**FIX ORDER**:
-1. ✅ Fix API key name: `voyage_api_key` → `voyage_ai_api_key`
-2. ✅ Lower similarity threshold: 0.7 → 0.5  
-3. ✅ Fix base64 decoding: `Deno.atob` → `atob`
-4. ✅ Test end-to-end RAG functionality with legal queries
-5. ✅ Clean up redundant edge functions
+**PRIORITY ACTIONS (WHEN RESUMED)**:
+1. **❗ Verify/Fix Supabase Storage trigger for `document-validation` function.**
+2. **❗ Re-attempt document upload.**
+3. **❗ Monitor document processing (ensure `document_processing_status` is updated).**
+4. **❗ Test RAG functionality with the new documents.**
+5. **🧹 Clean Up Edge Functions (after RAG stability confirmed by this test).**
 
 ---
 
-## ✅ COMPLETED TASKS (VERIFIED)
+## ✅ COMPLETED TASKS (VERIFIED - CODE LEVEL)
 
 ### **Infrastructure & Authentication ✅**
 1. ✅ **Supabase Setup**: Complete database schema with RLS policies
@@ -159,6 +189,11 @@ const binaryKey = atob(keyData);
 2. ✅ **System Architecture**: Documented in techstack.md
 3. ✅ **Bug Analysis**: Detailed analysis of all critical issues
 
+### **Frontend Refinements (Phase 1) ✅**
+*   `DocumentUpload.tsx`: Fixed subscription cleanup, implemented real upload progress, enhanced county dropdown ARIA.
+*   `Chat.tsx`: Removed old document context system, implemented dynamic filter fetching, refined message fetching logic.
+*   General: Implemented production console log management, reviewed TODOs.
+
 ---
 
 ## 📊 **SYSTEM ARCHITECTURE (VERIFIED)**
@@ -168,7 +203,7 @@ const binaryKey = atob(keyData);
 - **Backend**: Supabase Edge Functions  
 - **Document Processing**: Google Vertex AI (Gemini 2.0 Flash)
 - **Embeddings**: VoyageAI (voyage-3-large model)
-- **Chat/RAG**: Claude Sonnet 4 via Vertex AI
+- **Chat/RAG**: Claude 3 Sonnet via Vertex AI (model `claude-3-sonnet@20240229`)
 - **Vector Database**: Supabase + pgvector extension
 - **Authentication**: JWT service account
 - **Project ID**: weewihugifrttuibusjf
@@ -177,7 +212,7 @@ const binaryKey = atob(keyData);
 1. **Upload** → Document validation → Supabase Storage
 2. **Processing** → Vertex AI text extraction → Legal-aware chunking
 3. **Embeddings** → VoyageAI generation → pgvector storage  
-4. **Query** → Semantic search → Claude Sonnet 4 → Response
+4. **Query** → Semantic search → Claude 3 Sonnet → Response
 
 ### **Production Data ✅**
 - **Documents**: 2 successfully processed legal documents
@@ -188,34 +223,40 @@ const binaryKey = atob(keyData);
 
 ---
 
-**Last Updated**: January 23, 2025 - Comprehensive System Audit Complete
-**Next Action**: Fix critical bugs in rag-chat function
-**Status**: Ready for final bug fixes - System has excellent foundation, just needs 3 critical fixes
+**Last Updated**: July 29, 2024 - Full system test paused. Suspected Supabase Storage trigger issue for `document-validation`.
+**Next Action (When Resumed)**: Investigate and fix Storage trigger for `document-validation`.
+**Status**: System reset. Upload attempted. Processing stalled.
 
 ---
 
 ## 🎯 PRIORITY ACTIONS FOR THIS SESSION
 
-### **IMMEDIATE (NOW)** 
-1. **✅ Fix rag-chat Function Bugs**:
-   - API key name: `voyage_api_key` → `voyage_ai_api_key`
-   - Similarity threshold: 0.7 → 0.5
-   - Base64 decoding: `Deno.atob` → `atob`
+1. **⏸️ PAUSED: Full System Test (`document-validation` trigger suspected).**
+2. **TODO (When Resumed): Monitor document processing pipeline with new documents.**
+3. **TODO (When Resumed): Thoroughly test RAG chat functionality (`rag-chat` v7) against the new document set.**
+4. **🧹 Clean Up Edge Functions (if system test is successful).**
 
-2. **✅ Test RAG Functionality**:
-   - Deploy fixed function
-   - Test with legal queries ("Arizona escrow rates")
-   - Verify end-to-end pipeline works
+### **SUCCESS CRITERIA FOR CURRENT SYSTEM TEST (WHEN RESUMED)**
+- ✅ Both new documents upload and process successfully through all stages (validation, text extraction, chunking, embedding).
+- ✅ RAG chat (`rag-chat` v7) returns relevant legal information from the new documents.
+- ✅ No 404 errors from Claude 3 Sonnet / Vertex AI.
+- ✅ LLM responses correctly cite sources and include metadata from the new documents.
+- ✅ Filters (jurisdiction, document type) work as expected with the new data.
+- ✅ System operates without unexpected errors in logs.
 
-3. **✅ Clean Up Edge Functions**:
-   - Remove 10 redundant functions
-   - Keep only 3 core production functions
+### **Current Issues ⚠️**
+- **MAJOR BLOCKER**: `document-validation` Edge Function does not appear to be triggered after file upload to Supabase Storage. This prevents any backend document processing from starting.
+  - **Symptom**: No entry in `document_processing_status` table after upload.
+  - **Symptom**: No logs for `document-validation` or `document-processor` functions after upload.
+  - **Hypothesis**: Missing or misconfigured Supabase Storage trigger.
 
-### **SUCCESS CRITERIA**
-- ✅ RAG chat returns relevant legal information instead of "Query Failed"
-- ✅ Vector search finds relevant chunks from Arizona legal documents
-- ✅ Claude generates proper legal responses based on document context
-- ✅ Only essential edge functions remain deployed
+### **Monitoring Points 🔍**
+- **Resource Usage**: 13 Edge Functions deployed (may be excessive)
+- **API Rate Limits**: VoyageAI and Claude usage monitoring needed
+- **Large Document Processing**: Need to test with 10MB+ files
+- **Concurrent Processing**: Need to test multiple simultaneous uploads
+
+**Next Action**: User to switch tasks. When returning to this, first investigate Supabase Storage triggers for the `document-validation` function.
 
 ---
 
@@ -276,7 +317,7 @@ const binaryKey = atob(keyData);
 - **Backend**: Supabase Edge Functions
 - **Document Processing**: Google Vertex AI (Gemini 2.5 Flash Preview)
 - **Embeddings**: VoyageAI (voyage-3-large)
-- **Chat/RAG**: Claude Sonnet 4 via Vertex AI
+- **Chat/RAG**: Claude 3 Sonnet via Vertex AI (model `claude-3-sonnet@20240229`)
 - **Vector Database**: Supabase + pgvector
 - **Authentication**: JWT service account
 
@@ -284,7 +325,7 @@ const binaryKey = atob(keyData);
 1. **Upload** → Document validation → Supabase Storage
 2. **Processing** → Vertex AI text extraction → Legal-aware chunking  
 3. **Embeddings** → VoyageAI generation → pgvector storage
-4. **Query** → Semantic search → Claude Sonnet 4 → Response
+4. **Query** → Semantic search → Claude 3 Sonnet → Response
 
 ---
 
@@ -297,7 +338,10 @@ const binaryKey = atob(keyData);
 - ✅ Token limit exceeded errors (fixed with intelligent batching)
 
 ### **Current Issues ⚠️**
-- **None identified** - System is fully operational
+- **MAJOR BLOCKER**: `document-validation` Edge Function does not appear to be triggered after file upload to Supabase Storage. This prevents any backend document processing from starting.
+  - **Symptom**: No entry in `document_processing_status` table after upload.
+  - **Symptom**: No logs for `document-validation` or `document-processor` functions after upload.
+  - **Hypothesis**: Missing or misconfigured Supabase Storage trigger.
 
 ### **Monitoring Points 🔍**
 - **Resource Usage**: 13 Edge Functions deployed (may be excessive)
@@ -314,7 +358,7 @@ const binaryKey = atob(keyData);
 - ✅ High-quality text extraction from complex PDFs
 - ✅ Intelligent document chunking preserving legal structure
 - ✅ Vector embedding generation for semantic search
-- ✅ Advanced RAG queries with Claude Sonnet 4
+- ✅ Advanced RAG queries with Claude 3 Sonnet
 - ✅ Conversation management and chat history
 - ✅ Real-time processing status tracking
 
@@ -337,7 +381,7 @@ const binaryKey = atob(keyData);
 ### **User Required Workflow:**
 1. ✅ **Document conversion to RAG-ready markdown via Vertex AI API** → stored in Supabase
 2. ✅ **RAG-ready markdown sent to Voyage AI API for embedding** → stored in Supabase vector store  
-3. ✅ **Interactive chat uses Voyage AI API for query embedding + Claude API for LLM**
+3. ✅ **Interactive chat uses Voyage AI API for query embedding + Claude 3 Sonnet API (via Vertex) for LLM**
 
 ### **Current Implementation Analysis ✅**
 
@@ -358,9 +402,30 @@ const binaryKey = atob(keyData);
 #### **Step 3: Chat with Voyage AI + Claude ✅**
 - **Location**: `supabase/functions/rag-chat/index.ts:50-120` + `150-265`
 - **Query Embedding**: Voyage AI `voyage-3-large` model (STANDARDIZED) 
-- **LLM Response**: Claude Sonnet 4 via Vertex AI for legal analysis
+- **LLM Response**: Claude 3 Sonnet (model `claude-3-sonnet@20240229`) via Vertex AI for legal analysis
 - **Vector Search**: pgvector similarity search using query embeddings
 - **Fallback**: Text search backup if embedding generation fails
 - **✅ EMBEDDING CONSISTENCY**: Both documents and queries use `voyage-3-large`
+
+---
+
+## 📝 DOCUMENTATION NOTE (IMPORTANT)
+
+**With the new documentation structure (`document_index.md`, `ARCHITECTURE.md`, `BACKEND_GUIDE.md`, `FRONTEND_GUIDE.md`), please ensure that any permanent architectural insights, stable component descriptions, or resolved design decisions are moved from this `tasklist.md` into the appropriate static documentation files.**
+
+This `tasklist.md` should remain focused on dynamic operational tasks, active bug tracking, current system status, and immediate next steps. Avoid letting it become a long-term knowledge silo for information better suited to the more permanent guides. Link to the relevant sections in the static docs from here if needed for context on a task.
+
+---
+
+## 🔥 **IMMEDIATE NEXT STEPS (THIS SESSION)**
+
+**PRIMARY GOAL**: Conduct a full end-to-end system test starting from a completely clean data state to validate the stability and correctness of the entire workflow, especially the `rag-chat` v7 Edge Function. **CURRENTLY PAUSED due to document processing not initiating.**
+
+**PRIORITY ACTIONS (WHEN RESUMED)**:
+1. **❗ Verify/Fix Supabase Storage trigger for `document-validation` function.**
+2. **❗ Re-attempt document upload.**
+3. **❗ Monitor document processing (ensure `document_processing_status` is updated).**
+4. **❗ Test RAG functionality with the new documents.**
+5. **🧹 Clean Up Edge Functions (after RAG stability confirmed by this test).**
 
 ---

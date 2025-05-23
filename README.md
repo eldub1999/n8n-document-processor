@@ -83,46 +83,38 @@ The application will be available at `http://localhost:5173`
 
 ## 🏗️ Architecture
 
-### Frontend Stack
-- **React 19.1.0** with TypeScript
-- **Vite 6.3.5** for build tooling
-- **Tailwind CSS 4.1.7** for styling
-- **React Router 7.6.0** for navigation
-- **Supabase JS Client** for backend integration
+This project utilizes a React frontend and a Supabase backend. For a detailed understanding of the system architecture, components, design decisions, and technology stack, please refer to our comprehensive [System Architecture Document](./ARCHITECTURE.md).
 
-### Backend Stack (Supabase)
-- **PostgreSQL** database with Row Level Security
-- **Supabase Storage** for document files
-- **Edge Functions** for server-side processing
-- **Authentication** for user management
+Briefly:
+- **Frontend:** React, Vite, TypeScript, Tailwind CSS
+- **Backend:** Supabase (PostgreSQL, Authentication, Storage, Edge Functions)
 
-### Database Schema
-- `documents` table: Document metadata with content hashing
-- `document_versions` table: Version history tracking
-- Storage buckets: `documents` (current) and `archive` (versions)
+### Database Schema Overview
+
+Key tables include `documents`, `document_versions`, `document_processing_status`, `document_embeddings`, `chat_conversations`, and `chat_messages`. 
+For detailed schema information, please see the [Backend Guide](./BACKEND_GUIDE.md).
 
 ## 📁 Project Structure
 
 ```
 ├── frontend/                 # React frontend application
-│   ├── src/
-│   │   ├── components/      # Reusable UI components
-│   │   ├── pages/           # Page components
-│   │   ├── services/        # API and service integrations
-│   │   ├── hooks/           # Custom React hooks
-│   │   ├── layouts/         # Page layouts
-│   │   └── types/           # TypeScript definitions
-│   ├── package.json
-│   └── vite.config.ts
+│   ├── src/                   # Main source code
+│   # ... (for detailed structure, see FRONTEND_GUIDE.md)
 ├── supabase/                # Supabase backend configuration
 │   ├── functions/           # Edge Functions
 │   ├── migrations/          # Database migrations
 │   └── config.toml          # Supabase configuration
-├── docs/                    # Additional documentation
-├── README.md               # This file
+├── README.md               # This file: Overview and Quick Start
+├── document_index.md       # Index of all documentation
+├── ARCHITECTURE.md         # Detailed System Architecture
+├── BACKEND_GUIDE.md        # Backend Development Details
+├── FRONTEND_GUIDE.md       # Frontend Development Details
 ├── CONTRIBUTING.md         # Development guidelines
-└── CHANGELOG.md           # Version history
+├── CHANGELOG.md            # Version history
+└── TASKLIST.md             # Operational tasks and status
 ```
+
+For a complete guide to all documentation, please see the [Project Documentation Index](./document_index.md).
 
 ## 🔧 Development
 
@@ -187,11 +179,16 @@ curl -X POST https://your-project.supabase.co/functions/v1/document-validation \
 
 ## 📚 Documentation
 
-- **[Technical Architecture](./approach.md)** - Design decisions and system architecture
-- **[Technology Stack](./techstack.md)** - Detailed technology choices and dependencies
-- **[Edge Functions Guide](./edgefunctions.md)** - Implementation patterns and best practices
-- **[Task Management](./tasklist.md)** - Development progress and task tracking
-- **[Contributing Guidelines](./CONTRIBUTING.md)** - Development workflow and standards
+For a comprehensive understanding of the project, including its architecture, development guides, and operational status, please start with our **[Project Documentation Index](./document_index.md)**.
+
+This index will guide you to detailed documents such as:
+- **[System Architecture](./ARCHITECTURE.md)**
+- **[Backend Guide](./BACKEND_GUIDE.md)**
+- **[Frontend Guide](./FRONTEND_GUIDE.md)**
+- **[Contributing Guidelines](./CONTRIBUTING.md)**
+- **[Task Management & Status](./TASKLIST.md)**
+
+*(The previous links to techstack.md, edgefunctions.md, and approach.md have been removed as their content is now integrated into the new documentation structure.)*
 
 ## 🚀 Deployment
 
