@@ -167,21 +167,20 @@ const DocumentUpload = () => {
   // Check if all individual counties are selected
   const allCountiesSelected = availableCounties.length > 0 && selectedCounties.length === availableCounties.length;
 
-  // Handle county selection
-  const handleCountyToggle = (countyValue: string) => {
+  // Handle county selection with proper state management
+  const handleCountyChange = (countyValue: string, checked: boolean) => {
     setSelectedCounties(prev => {
-      if (prev.includes(countyValue)) {
+      if (checked) {
+        // Add county if not already selected
+        return prev.includes(countyValue) ? prev : [...prev, countyValue];
+      } else {
         // Remove county
         return prev.filter(c => c !== countyValue);
-      } else {
-        // Add county
-        const newSelection = [...prev, countyValue];
-        return newSelection;
       }
     });
   };
 
-  // Handle select all counties
+  // Handle select all counties with proper state management
   const handleSelectAllCounties = (checked: boolean) => {
     if (checked) {
       setSelectedCounties(availableCounties.map(county => county.value));
@@ -347,13 +346,19 @@ const DocumentUpload = () => {
                   type="button"
                   onClick={() => setCountyDropdownOpen(!countyDropdownOpen)}
                   className="w-full px-3 py-2 text-left border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  aria-haspopup="listbox"
+                  aria-expanded={countyDropdownOpen}
                 >
                   <span className="block truncate text-gray-900">
                     {getSelectedCountiesText()}
                   </span>
                   <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                    <svg className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 3a1 1 0 01.707.293l3 3a1 1 0 01-1.414 1.414L10 5.414 7.707 7.707a1 1 0 01-1.414-1.414l3-3A1 1 0 0110 3z" clipRule="evenodd" />
+                    <svg 
+                      className={`h-5 w-5 text-gray-400 transform transition-transform ${countyDropdownOpen ? 'rotate-180' : ''}`} 
+                      viewBox="0 0 20 20" 
+                      fill="currentColor"
+                    >
+                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
                     </svg>
                   </span>
                 </button>
@@ -361,26 +366,48 @@ const DocumentUpload = () => {
                 {/* Dropdown Options */}
                 {countyDropdownOpen && (
                   <div className="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none">
-                    {availableCounties.map((county) => (
-                      <div
-                        key={county.value}
-                        className="cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-blue-50"
-                        onClick={() => handleCountyToggle(county.value)}
-                      >
-                        <div className="flex items-center">
+                    <div className="px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide border-b border-gray-200">
+                      Select Counties ({selectedCounties.length} selected)
+                    </div>
+                    
+                    {availableCounties.map((county) => {
+                      const isSelected = selectedCounties.includes(county.value);
+                      return (
+                        <label
+                          key={county.value}
+                          className="flex items-center px-3 py-2 hover:bg-blue-50 cursor-pointer"
+                        >
                           <input
                             type="checkbox"
-                            checked={selectedCounties.includes(county.value)}
-                            onChange={() => {}} // Handled by parent onClick
+                            checked={isSelected}
+                            onChange={(e) => handleCountyChange(county.value, e.target.checked)}
                             className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mr-3"
-                            onClick={(e) => e.stopPropagation()}
                           />
-                          <span className="font-normal text-gray-900">
+                          <span className={`text-sm ${isSelected ? 'font-medium text-blue-900' : 'text-gray-900'}`}>
                             {county.label}
                           </span>
-                        </div>
-                      </div>
-                    ))}
+                          {isSelected && (
+                            <svg className="ml-auto h-4 w-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                        </label>
+                      );
+                    })}
+                    
+                    {/* Dropdown Actions */}
+                    <div className="border-t border-gray-200 px-3 py-2 flex justify-between items-center bg-gray-50">
+                      <span className="text-xs text-gray-500">
+                        {selectedCounties.length} of {availableCounties.length} selected
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setCountyDropdownOpen(false)}
+                        className="text-xs font-medium text-blue-600 hover:text-blue-500"
+                      >
+                        Done
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -397,8 +424,9 @@ const DocumentUpload = () => {
                           {county?.label || countyValue}
                           <button
                             type="button"
-                            onClick={() => handleCountyToggle(countyValue)}
-                            className="ml-1.5 h-4 w-4 rounded-full inline-flex items-center justify-center text-blue-400 hover:bg-blue-200 hover:text-blue-500 focus:outline-none"
+                            onClick={() => handleCountyChange(countyValue, false)}
+                            className="ml-1.5 h-4 w-4 rounded-full inline-flex items-center justify-center text-blue-400 hover:bg-blue-200 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            aria-label={`Remove ${county?.label || countyValue}`}
                           >
                             <svg className="h-2 w-2" stroke="currentColor" fill="none" viewBox="0 0 8 8">
                               <path strokeLinecap="round" strokeWidth="1.5" d="m1 1 6 6m0-6L1 7" />
@@ -408,6 +436,17 @@ const DocumentUpload = () => {
                       );
                     })}
                   </div>
+                )}
+
+                {/* Clear All Button */}
+                {selectedCounties.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCounties([])}
+                    className="mt-2 text-xs text-gray-500 hover:text-gray-700 underline"
+                  >
+                    Clear all selections
+                  </button>
                 )}
 
                 {/* Validation Message */}
