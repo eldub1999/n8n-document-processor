@@ -125,6 +125,10 @@ const DocumentUpload = () => {
       setUploading(true);
       setError(null);
       
+      console.log('Starting document upload process...');
+      console.log('File:', selectedFile.name, selectedFile.size, selectedFile.type);
+      console.log('Metadata:', { jurisdiction, documentType, counties: selectedCounties, description });
+      
       const documentData: DocumentUploadType = {
         file: selectedFile,
         description: description.trim() || undefined,
@@ -136,7 +140,9 @@ const DocumentUpload = () => {
       };
       
       // Upload the document
+      console.log('Calling uploadDocument with data:', documentData);
       const uploadedDocument = await uploadDocument(documentData);
+      console.log('Document uploaded successfully:', uploadedDocument);
       
       toaster.create({
         title: 'Success',
@@ -147,11 +153,15 @@ const DocumentUpload = () => {
       setShowProcessingStatus(true);
       
       try {
+        console.log('Starting document processing for ID:', uploadedDocument.id);
+        
         // Subscribe to processing status updates
         const unsubscribe = subscribeToProcessingStatus(uploadedDocument.id, (status) => {
+          console.log('Processing status update:', status);
           setProcessingStatus(status);
           
           if (status?.status === 'completed') {
+            console.log('Processing completed successfully');
             toaster.create({
               title: 'Processing Complete',
               description: 'Document is now ready for AI-powered search and chat!',
@@ -159,6 +169,7 @@ const DocumentUpload = () => {
             // Auto-navigate after a short delay to let user see the completion message
             setTimeout(() => navigate('/documents'), 2000);
           } else if (status?.status === 'failed') {
+            console.error('Processing failed:', status);
             toaster.create({
               title: 'Processing Failed',
               description: 'Document uploaded but AI processing failed. You can retry processing later.',
@@ -167,13 +178,19 @@ const DocumentUpload = () => {
         });
         
         // Trigger processing
+        console.log('Triggering document processing...');
         await processDocument(uploadedDocument.id);
+        console.log('Document processing triggered successfully');
         
         // Clean up subscription when component unmounts or processing completes
         return unsubscribe;
         
       } catch (processingError) {
         console.error('Error starting document processing:', processingError);
+        console.error('Processing error details:', {
+          message: processingError instanceof Error ? processingError.message : String(processingError),
+          stack: processingError instanceof Error ? processingError.stack : undefined
+        });
         toaster.create({
           title: 'Processing Error',
           description: 'Document uploaded but AI processing could not be started.',
@@ -184,6 +201,11 @@ const DocumentUpload = () => {
       
     } catch (err) {
       console.error('Error uploading document:', err);
+      console.error('Upload error details:', {
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined
+      });
+      
       const errorMessage = err instanceof Error ? err.message : 'Failed to upload document';
       setError(errorMessage);
       
@@ -193,6 +215,12 @@ const DocumentUpload = () => {
           title: 'Duplicate Document',
           description: 'This document is already in the system.',
         });
+      } else if (errorMessage.includes('User must be logged in')) {
+        toaster.create({
+          title: 'Authentication Required',
+          description: 'Please log in to upload documents.',
+        });
+        // Redirect to login or auth flow
       } else {
         toaster.create({
           title: 'Upload Failed',

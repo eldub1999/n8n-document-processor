@@ -172,33 +172,14 @@ export function subscribeToProcessingStatus(
  */
 export async function sendRAGQuery(request: RAGQueryRequest): Promise<RAGQueryResponse> {
   try {
-    // First try to generate embedding with retry logic
-    console.log('Attempting to generate embedding for query...');
-    const embedding = await generateEmbeddingWithRetry(request.query);
+    console.log('Sending RAG query to rag-chat function...');
     
-    if (embedding) {
-      // Try vector search first with the generated embedding
-      console.log('Using vector search with generated embedding');
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/rag-query`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify({
-          ...request,
-          embedding: embedding // Pass the pre-generated embedding
-        })
-      });
-
-      if (response.ok) {
-        return await response.json();
-      }
-    }
-
-    // Fallback to text search if embedding generation failed or vector search failed
-    console.log('Falling back to text-based search...');
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/simple-rag-test`, {
+    // Call the comprehensive rag-chat function which handles:
+    // - Embedding generation with Voyage AI
+    // - Vector search with automatic text search fallback
+    // - Claude response generation
+    // - Conversation storage
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/rag-chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -206,23 +187,26 @@ export async function sendRAGQuery(request: RAGQueryRequest): Promise<RAGQueryRe
       },
       body: JSON.stringify({
         query: request.query,
-        document_context: request.documentContext
+        conversationId: request.conversationId,
+        documentContext: request.documentContext,
+        maxResults: request.maxResults || 10
       })
     });
 
     if (!response.ok) {
-      throw new Error(`RAG query failed: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`RAG query failed: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     const result = await response.json();
     
-    // Transform the simple search result to match RAGQueryResponse format
+    // Transform the rag-chat response to match RAGQueryResponse format
     return {
-      success: true,
-      response: result.answer || result.response || 'I found some relevant information but couldn\'t generate a comprehensive answer.',
+      success: result.success || true,
+      response: result.response,
       sources: result.sources || [],
-      conversationId: request.conversationId,
-      details: 'Used text search fallback due to Voyage AI rate limits'
+      conversationId: result.conversationId || request.conversationId,
+      details: result.details
     };
   } catch (error) {
     console.error('RAG query error:', error);

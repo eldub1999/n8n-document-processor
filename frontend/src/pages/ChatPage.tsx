@@ -1,5 +1,6 @@
 import { useAuth } from '../hooks/useAuth';
 import Chat from '../components/Chat';
+import DebugInfo from '../components/DebugInfo';
 import { Navigate } from 'react-router-dom';
 
 const ChatPage = () => {
@@ -17,7 +18,15 @@ const ChatPage = () => {
     return <Navigate to="/login" replace />;
   }
 
-  return <Chat />;
+  return (
+    <div>
+      {/* Debug info positioned at top */}
+      <div className="p-4 border-b border-gray-200">
+        <DebugInfo />
+      </div>
+      <Chat />
+    </div>
+  );
 };
 
 export default ChatPage; 

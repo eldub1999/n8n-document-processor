@@ -332,7 +332,7 @@ const Chat = () => {
                 }}
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
               />
-              <span className="ml-2 text-sm text-gray-600">All documents</span>
+              <span className="ml-2 text-sm text-gray-600">Search all documents</span>
             </label>
             {availableDocuments.map(doc => (
               <label key={doc.id} className="flex items-center">
@@ -348,14 +348,19 @@ const Chat = () => {
                   }}
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
-                <span className="ml-2 text-sm text-gray-700 truncate">{doc.filename}</span>
+                <span className="ml-2 text-sm text-gray-700 truncate">
+                  ✅ {doc.filename}
+                </span>
               </label>
             ))}
           </div>
           {availableDocuments.length === 0 && (
-            <p className="text-sm text-gray-500 mt-2">
-              No documents ready for chat. Please upload and process documents first.
-            </p>
+            <div className="text-sm text-yellow-600 mt-2 p-3 bg-yellow-50 rounded-md border border-yellow-200">
+              <p className="font-medium">No documents ready for chat</p>
+              <p className="text-xs mt-1">
+                Documents need to be processed before appearing here. Check the Documents page to see processing status.
+              </p>
+            </div>
           )}
         </div>
 
@@ -504,17 +509,17 @@ const Chat = () => {
                 placeholder="Ask a question about your documents..."
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
                 rows={3}
-                disabled={isLoading || availableDocuments.length === 0}
+                disabled={isLoading}
               />
               {availableDocuments.length === 0 && (
-                <p className="mt-1 text-xs text-gray-500">
-                  No documents available for chat. Please upload and process documents first.
+                <p className="mt-1 text-xs text-yellow-600">
+                  No documents specifically ready for chat, but you can still search all uploaded documents.
                 </p>
               )}
             </div>
             <button
               onClick={handleSendMessage}
-              disabled={!query.trim() || isLoading || availableDocuments.length === 0}
+              disabled={!query.trim() || isLoading}
               className={`px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {isLoading ? (
