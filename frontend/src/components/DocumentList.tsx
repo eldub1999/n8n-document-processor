@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getDocuments, deleteDocument, getDocumentUrl } from '../services/documentService';
 import { 
@@ -23,7 +23,25 @@ const DocumentList = () => {
     filterText: '',
   });
   
+  // Track active subscriptions to prevent leaks
+  const subscriptionsRef = useRef<Map<string, () => void>>(new Map());
+  
   const navigate = useNavigate();
+  
+  // Cleanup function for all subscriptions
+  const cleanupSubscriptions = () => {
+    subscriptionsRef.current.forEach((unsubscribe) => {
+      unsubscribe();
+    });
+    subscriptionsRef.current.clear();
+  };
+  
+  // Cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      cleanupSubscriptions();
+    };
+  }, []);
   
   useEffect(() => {
     loadDocuments();
@@ -32,6 +50,10 @@ const DocumentList = () => {
   const loadDocuments = async () => {
     try {
       setLoading(true);
+      
+      // Cleanup existing subscriptions before loading new ones
+      cleanupSubscriptions();
+      
       const docs = await getDocuments(searchParams);
       
       // Get processing status for all documents
@@ -39,17 +61,41 @@ const DocumentList = () => {
       setDocuments(docsWithStatus);
       setError(null);
       
-      // Subscribe to status updates for processing documents
-      docsWithStatus.forEach(doc => {
-        if (doc.processing_status?.status === 'processing') {
-          subscribeToProcessingStatus(doc.id, (status) => {
-            setDocuments(prev => prev.map(d => 
-              d.id === doc.id 
-                ? { ...d, processing_status: status || undefined, is_ready_for_chat: status?.status === 'completed' || false } as DocumentWithProcessingStatus
-                : d
-            ));
-          });
-        }
+      // Only subscribe to documents that are actively processing
+      const processingDocs = docsWithStatus.filter(doc => 
+        doc.processing_status?.status === 'processing'
+      );
+      
+      // If no documents are processing, use polling as fallback for better performance
+      if (processingDocs.length === 0) {
+        console.log('No processing documents, skipping realtime subscriptions');
+        return;
+      }
+      
+      console.log(`Setting up realtime subscriptions for ${processingDocs.length} processing documents`);
+      
+      // Subscribe to status updates ONLY for processing documents
+      processingDocs.forEach(doc => {
+        const unsubscribe = subscribeToProcessingStatus(doc.id, (status) => {
+          setDocuments(prev => prev.map(d => 
+            d.id === doc.id 
+              ? { ...d, processing_status: status || undefined, is_ready_for_chat: status?.status === 'completed' || false } as DocumentWithProcessingStatus
+              : d
+          ));
+          
+          // Auto-cleanup subscription when processing completes
+          if (status?.status === 'completed' || status?.status === 'failed') {
+            const unsubscribeFunc = subscriptionsRef.current.get(doc.id);
+            if (unsubscribeFunc) {
+              unsubscribeFunc();
+              subscriptionsRef.current.delete(doc.id);
+              console.log(`Cleaned up subscription for completed document: ${doc.id}`);
+            }
+          }
+        });
+        
+        // Store unsubscribe function for cleanup
+        subscriptionsRef.current.set(doc.id, unsubscribe);
       });
       
     } catch (err) {

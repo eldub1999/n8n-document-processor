@@ -103,11 +103,32 @@ export async function getDocumentsWithProcessingStatus(documentIds: string[]): P
 
 /**
  * Subscribe to processing status updates for a document
+ * Now with debouncing to reduce realtime query frequency
  */
 export function subscribeToProcessingStatus(
   documentId: string,
   callback: (status: DocumentProcessingStatus | null) => void
 ) {
+  let debounceTimeout: NodeJS.Timeout | null = null;
+  
+  const debouncedCallback = (status: DocumentProcessingStatus | null) => {
+    // Clear existing timeout
+    if (debounceTimeout) {
+      clearTimeout(debounceTimeout);
+    }
+    
+    // For completed/failed states, call immediately
+    if (status?.status === 'completed' || status?.status === 'failed' || status === null) {
+      callback(status);
+      return;
+    }
+    
+    // For processing updates, debounce to reduce frequency
+    debounceTimeout = setTimeout(() => {
+      callback(status);
+    }, 1000); // 1 second debounce for progress updates
+  };
+  
   const subscription = supabase
     .channel(`processing_status_${documentId}`)
     .on(
@@ -120,15 +141,19 @@ export function subscribeToProcessingStatus(
       },
       (payload) => {
         if (payload.eventType === 'DELETE') {
-          callback(null);
+          debouncedCallback(null);
         } else {
-          callback(payload.new as DocumentProcessingStatus);
+          debouncedCallback(payload.new as DocumentProcessingStatus);
         }
       }
     )
     .subscribe();
 
   return () => {
+    // Clean up debounce timeout
+    if (debounceTimeout) {
+      clearTimeout(debounceTimeout);
+    }
     supabase.removeChannel(subscription);
   };
 }
