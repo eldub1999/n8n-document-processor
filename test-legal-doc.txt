@@ -1,0 +1,19 @@
+This is a test legal document. This document contains sample legal content for testing the RAG system.
+
+LEGAL NOTICE: This is a sample document for testing purposes only.
+
+Article I: General Provisions
+This test document contains legal-style language to verify that our document processing system can handle legal terminology and structure.
+
+Article II: Processing Requirements  
+The document should be chunked appropriately and embedded using the Voyage AI embedding model for semantic search capabilities.
+
+Article III: Testing Protocol
+When this document is processed, it should:
+1. Extract text successfully
+2. Create appropriate chunks
+3. Generate embeddings for each chunk
+4. Store embeddings in the database
+5. Enable semantic search and chat functionality
+
+CONCLUSION: This test document verifies end-to-end RAG processing. 
