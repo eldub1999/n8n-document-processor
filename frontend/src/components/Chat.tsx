@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { 
   sendRAGQuery, 
@@ -36,11 +36,40 @@ const Chat = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  // Memoized functions for performance
+  const loadConversations = useCallback(async () => {
+    try {
+      const convs = await getConversations();
+      setConversations(convs);
+    } catch (error) {
+      console.error('Failed to load conversations:', error);
+    }
+  }, []);
+
+  const loadAvailableDocuments = useCallback(async () => {
+    try {
+      const docs = await getDocumentsReadyForChat();
+      setAvailableDocuments(docs);
+    } catch (error) {
+      console.error('Failed to load documents:', error);
+    }
+  }, []);
+
+  const loadConversationMessages = useCallback(async (conversationId: string) => {
+    try {
+      const msgs = await getConversationMessages(conversationId);
+      setMessages(msgs);
+    } catch (error) {
+      console.error('Failed to load messages:', error);
+      setError('Failed to load conversation messages');
+    }
+  }, []);
+
   // Load initial data
   useEffect(() => {
     loadConversations();
     loadAvailableDocuments();
-  }, []);
+  }, [loadConversations, loadAvailableDocuments]);
 
   // Handle URL parameters for document pre-selection
   useEffect(() => {
@@ -77,35 +106,7 @@ const Chat = () => {
     return unsubscribe;
   }, [currentConversation]);
 
-  const loadConversations = async () => {
-    try {
-      const convs = await getConversations();
-      setConversations(convs);
-    } catch (error) {
-      console.error('Failed to load conversations:', error);
-    }
-  };
-
-  const loadAvailableDocuments = async () => {
-    try {
-      const docs = await getDocumentsReadyForChat();
-      setAvailableDocuments(docs);
-    } catch (error) {
-      console.error('Failed to load documents:', error);
-    }
-  };
-
-  const loadConversationMessages = async (conversationId: string) => {
-    try {
-      const msgs = await getConversationMessages(conversationId);
-      setMessages(msgs);
-    } catch (error) {
-      console.error('Failed to load messages:', error);
-      setError('Failed to load conversation messages');
-    }
-  };
-
-  const handleNewConversation = async () => {
+  const handleNewConversation = useCallback(async () => {
     try {
       const title = 'New Conversation';
       const newConv = await createConversation(title, selectedDocuments);
@@ -117,23 +118,27 @@ const Chat = () => {
       console.error('Failed to create conversation:', error);
       setError('Failed to create new conversation');
     }
-  };
+  }, [selectedDocuments]);
 
-  const handleSelectConversation = async (conversation: ChatConversation) => {
+  const handleSelectConversation = useCallback(async (conversation: ChatConversation) => {
     setCurrentConversation(conversation);
     setSelectedDocuments(conversation.document_context);
     await loadConversationMessages(conversation.id);
     setError(null);
-  };
+  }, [loadConversationMessages]);
 
-  const handleDeleteConversation = async (conversationId: string) => {
+  const handleDeleteConversation = useCallback(async (conversationId: string) => {
+    if (!confirm('Are you sure you want to delete this conversation?')) return;
+    
     try {
       await deleteConversation(conversationId);
       setConversations(prev => prev.filter(c => c.id !== conversationId));
+      
       if (currentConversation?.id === conversationId) {
         setCurrentConversation(null);
         setMessages([]);
       }
+      
       toaster.create({
         title: 'Success',
         description: 'Conversation deleted successfully',
@@ -145,66 +150,100 @@ const Chat = () => {
         description: 'Failed to delete conversation',
       });
     }
-  };
+  }, [currentConversation]);
 
-  const handleSendMessage = async () => {
-    if (!query.trim()) return;
+  const handleDocumentSelection = useCallback((documentId: string) => {
+    setSelectedDocuments(prev => 
+      prev.includes(documentId)
+        ? prev.filter(id => id !== documentId)
+        : [...prev, documentId]
+    );
+  }, []);
+
+  const handleSendMessage = useCallback(async () => {
+    if (!query.trim() || isLoading) return;
     
-    const userQuery = query.trim();
+    const userMessage = query.trim();
     setQuery('');
     setIsLoading(true);
     setError(null);
-
+    
     try {
-      const request: RAGQueryRequest = {
-        query: userQuery,
-        conversationId: currentConversation?.id,
-        documentContext: selectedDocuments.length > 0 ? selectedDocuments : undefined,
-        maxResults: 100
+      // Create conversation if none exists
+      let conversation = currentConversation;
+      if (!conversation) {
+        conversation = await createConversation('New Conversation', selectedDocuments);
+        setCurrentConversation(conversation);
+        setConversations(prev => [conversation!, ...prev]);
+      }
+      
+      // Add user message to state immediately for better UX
+      const tempUserMessage: ChatMessage = {
+        id: `temp-${Date.now()}`,
+        conversation_id: conversation.id,
+        role: 'user',
+        content: userMessage,
+        created_at: new Date().toISOString(),
+        message_metadata: {},
+        document_sources: selectedDocuments,
+        embedding_sources: [],
+        processing_time_ms: undefined,
+        token_count: undefined
       };
-
+      
+      setMessages(prev => [...prev, tempUserMessage]);
+      
+      // Send query to RAG system
+      const request: RAGQueryRequest = {
+        query: userMessage,
+        conversationId: conversation.id,
+        documentContext: selectedDocuments,
+        maxResults: 10
+      };
+      
       const response = await sendRAGQuery(request);
-
-      if (!response.success) {
-        throw new Error(response.error || 'Query failed');
+      
+      if (response.success) {
+        // The assistant message should be added via real-time subscription
+        // But we'll also refetch to ensure consistency
+        setTimeout(() => loadConversationMessages(conversation!.id), 500);
+      } else {
+        throw new Error('Query failed');
       }
-
-      // Update current conversation if it was created
-      if (response.conversationId && !currentConversation) {
-        const newConv = conversations.find(c => c.id === response.conversationId);
-        if (newConv) {
-          setCurrentConversation(newConv);
-        } else {
-          // Reload conversations to get the new one
-          await loadConversations();
-        }
-      }
-
-      // Messages will be updated via real-time subscription
-      // But in case subscription fails, reload messages
-      if (response.conversationId) {
-        setTimeout(() => loadConversationMessages(response.conversationId!), 500);
-      }
-
+      
     } catch (error) {
-      console.error('Failed to send message:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
-      setError(errorMessage);
+      console.error('Error sending message:', error);
+      setError(error instanceof Error ? error.message : 'Failed to send message');
       toaster.create({
-        title: 'Query Failed',
-        description: errorMessage,
+        title: 'Error',
+        description: 'Failed to send message. Please try again.',
       });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [query, isLoading, currentConversation, selectedDocuments, loadConversationMessages]);
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  // Memoized computed values for performance
+  const selectedDocumentNames = useMemo(() => {
+    return availableDocuments
+      .filter(doc => selectedDocuments.includes(doc.id))
+      .map(doc => doc.filename);
+  }, [availableDocuments, selectedDocuments]);
+
+  const hasSelectedDocuments = useMemo(() => {
+    return selectedDocuments.length > 0;
+  }, [selectedDocuments.length]);
+
+  const canSendMessage = useMemo(() => {
+    return query.trim().length > 0 && !isLoading;
+  }, [query, isLoading]);
+
+  const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
-  };
+  }, [handleSendMessage]);
 
   const formatMessageTime = (timestamp: string) => {
     return new Date(timestamp).toLocaleTimeString([], { 

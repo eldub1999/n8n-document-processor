@@ -61,42 +61,46 @@ export async function getDocumentProcessingStatus(documentId: string): Promise<D
 
 /**
  * Get processing status for multiple documents
+ * Optimized to use a single JOIN query instead of N+1 queries
  */
 export async function getDocumentsWithProcessingStatus(documentIds: string[]): Promise<DocumentWithProcessingStatus[]> {
   if (documentIds.length === 0) return [];
 
-  // Get documents
-  const { data: documents, error: docError } = await supabase
+  // Single optimized query with LEFT JOIN to get documents and their processing status
+  const { data, error } = await supabase
     .from('documents')
-    .select('*')
+    .select(`
+      *,
+      document_processing_status (
+        document_id,
+        status,
+        stage,
+        progress_percentage,
+        error_message,
+        created_at,
+        updated_at
+      )
+    `)
     .in('id', documentIds);
 
-  if (docError) {
-    throw new Error(`Failed to get documents: ${docError.message}`);
+  if (error) {
+    throw new Error(`Failed to get documents with processing status: ${error.message}`);
   }
 
-  // Get processing statuses
-  const { data: statuses, error: statusError } = await supabase
-    .from('document_processing_status')
-    .select('*')
-    .in('document_id', documentIds);
+  // Transform the joined result
+  return data.map(doc => {
+    // Get the processing status (there should be 0 or 1 records due to the relationship)
+    const processingStatus = doc.document_processing_status && doc.document_processing_status.length > 0 
+      ? doc.document_processing_status[0] 
+      : null;
 
-  if (statusError) {
-    console.warn('Failed to get processing statuses:', statusError);
-  }
-
-  // Combine documents with their processing status
-  const statusMap = new Map<string, DocumentProcessingStatus>();
-  statuses?.forEach(status => {
-    statusMap.set(status.document_id, status);
-  });
-
-  return documents.map(doc => {
-    const status = statusMap.get(doc.id);
+    // Remove the joined data and return clean document with processing status
+    const { document_processing_status, ...cleanDoc } = doc;
+    
     return {
-      ...doc,
-      processing_status: status,
-      is_ready_for_chat: status?.status === 'completed'
+      ...cleanDoc,
+      processing_status: processingStatus,
+      is_ready_for_chat: processingStatus?.status === 'completed'
     };
   });
 }

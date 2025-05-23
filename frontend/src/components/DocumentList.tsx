@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getDocuments, deleteDocument, getDocumentUrl } from '../services/documentService';
 import { 
@@ -28,26 +28,23 @@ const DocumentList = () => {
   
   const navigate = useNavigate();
   
-  // Cleanup function for all subscriptions
-  const cleanupSubscriptions = () => {
+  // Memoize cleanup function to prevent re-creation on every render
+  const cleanupSubscriptions = useCallback(() => {
     subscriptionsRef.current.forEach((unsubscribe) => {
       unsubscribe();
     });
     subscriptionsRef.current.clear();
-  };
+  }, []);
   
   // Cleanup on component unmount
   useEffect(() => {
     return () => {
       cleanupSubscriptions();
     };
-  }, []);
+  }, [cleanupSubscriptions]);
   
-  useEffect(() => {
-    loadDocuments();
-  }, [searchParams]);
-  
-  const loadDocuments = async () => {
+  // Memoize the loadDocuments function to prevent unnecessary re-renders
+  const loadDocuments = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -56,7 +53,7 @@ const DocumentList = () => {
       
       const docs = await getDocuments(searchParams);
       
-      // Get processing status for all documents
+      // Get processing status for all documents (now optimized with single query)
       const docsWithStatus = await getDocumentsWithProcessingStatus(docs.map(d => d.id));
       setDocuments(docsWithStatus);
       setError(null);
@@ -108,9 +105,14 @@ const DocumentList = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchParams, cleanupSubscriptions]);
   
-  const handleDownload = async (doc: DocumentWithProcessingStatus) => {
+  useEffect(() => {
+    loadDocuments();
+  }, [loadDocuments]);
+  
+  // Memoize expensive handler functions
+  const handleDownload = useCallback(async (doc: DocumentWithProcessingStatus) => {
     try {
       // Cast to Document type for getDocumentUrl
       const docForDownload: Document = {
@@ -130,9 +132,9 @@ const DocumentList = () => {
         description: 'Failed to download document. Please try again.',
       });
     }
-  };
+  }, []);
   
-  const handleDelete = async (id: string) => {
+  const handleDelete = useCallback(async (id: string) => {
     if (!confirm('Are you sure you want to delete this document?')) return;
     
     try {
@@ -149,54 +151,55 @@ const DocumentList = () => {
         description: 'Failed to delete document. Please try again.',
       });
     }
-  };
+  }, [loadDocuments]);
   
-  const handleViewDetails = (id: string) => {
+  const handleViewDetails = useCallback((id: string) => {
     navigate(`/documents/${id}`);
-  };
+  }, [navigate]);
   
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchParams({
-      ...searchParams,
+  const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchParams(prev => ({
+      ...prev,
       filterText: e.target.value,
       offset: 0, // Reset pagination when searching
-    });
-  };
+    }));
+  }, []);
   
-  const handleSort = (sortBy: DocumentSearchParams['sortBy']) => {
-    setSearchParams({
-      ...searchParams,
+  const handleSort = useCallback((sortBy: DocumentSearchParams['sortBy']) => {
+    setSearchParams(prev => ({
+      ...prev,
       sortBy,
       sortOrder: 
-        searchParams.sortBy === sortBy && searchParams.sortOrder === 'asc' 
+        prev.sortBy === sortBy && prev.sortOrder === 'asc' 
           ? 'desc' 
           : 'asc',
       offset: 0, // Reset pagination when sorting
-    });
-  };
+    }));
+  }, []);
   
-  const getSortIndicator = (column: DocumentSearchParams['sortBy']) => {
+  // Memoize expensive calculations
+  const getSortIndicator = useCallback((column: DocumentSearchParams['sortBy']) => {
     if (searchParams.sortBy !== column) return null;
     return searchParams.sortOrder === 'asc' ? '↑' : '↓';
-  };
+  }, [searchParams.sortBy, searchParams.sortOrder]);
   
-  const formatDate = (dateString: string) => {
+  const formatDate = useMemo(() => (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
     });
-  };
+  }, []);
   
-  const formatFileSize = (bytes: number) => {
+  const formatFileSize = useMemo(() => (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
+  }, []);
   
-  const handleProcessDocument = async (documentId: string) => {
+  const handleProcessDocument = useCallback(async (documentId: string) => {
     try {
       setProcessingDocuments(prev => new Set(prev).add(documentId));
       await processDocument(documentId);
@@ -222,12 +225,159 @@ const DocumentList = () => {
         return newSet;
       });
     }
-  };
+  }, [loadDocuments]);
 
-  const handleChatWithDocument = (documentId: string, filename: string) => {
+  const handleChatWithDocument = useCallback((documentId: string, filename: string) => {
     // Navigate to chat with this document pre-selected
     navigate(`/chat?doc=${documentId}&title=${encodeURIComponent(filename)}`);
-  };
+  }, [navigate]);
+  
+  // Memoized document row component to prevent unnecessary re-renders
+  const DocumentRow = memo(({ 
+    doc, 
+    processingDocuments, 
+    onDownload, 
+    onDelete, 
+    onViewDetails, 
+    onProcessDocument, 
+    onChatWithDocument, 
+    formatDate, 
+    formatFileSize 
+  }: {
+    doc: DocumentWithProcessingStatus;
+    processingDocuments: Set<string>;
+    onDownload: (doc: DocumentWithProcessingStatus) => void;
+    onDelete: (id: string) => void;
+    onViewDetails: (id: string) => void;
+    onProcessDocument: (id: string) => void;
+    onChatWithDocument: (id: string, filename: string) => void;
+    formatDate: (dateString: string) => string;
+    formatFileSize: (bytes: number) => string;
+  }) => (
+    <tr key={doc.id} className="hover:bg-zinc-50">
+      <td className="px-6 py-4">
+        <div className="flex items-center">
+          <div className="text-zinc-800 font-medium truncate max-w-[200px]">
+            {doc.filename}
+          </div>
+        </div>
+      </td>
+      <td className="px-6 py-4">
+        {doc.processing_status ? (
+          <div className="space-y-1">
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+              doc.processing_status.status === 'completed' 
+                ? 'bg-green-100 text-green-800'
+                : doc.processing_status.status === 'failed'
+                ? 'bg-red-100 text-red-800'
+                : doc.processing_status.status === 'processing'
+                ? 'bg-yellow-100 text-yellow-800'
+                : 'bg-gray-100 text-gray-800'
+            }`}>
+              {doc.processing_status.status.charAt(0).toUpperCase() + doc.processing_status.status.slice(1)}
+            </span>
+            {doc.processing_status.status === 'processing' && (
+              <div className="w-full bg-gray-200 rounded-full h-1">
+                <div 
+                  className="bg-blue-600 h-1 rounded-full transition-all duration-300"
+                  style={{ width: `${doc.processing_status.progress_percentage}%` }}
+                ></div>
+              </div>
+            )}
+            {doc.processing_status.status === 'completed' && (
+              <div className="text-xs text-green-600">
+                Ready for chat
+              </div>
+            )}
+            {doc.processing_status.status === 'failed' && doc.processing_status.error_message && (
+              <div className="text-xs text-red-600" title={doc.processing_status.error_message}>
+                Error: {doc.processing_status.error_message.substring(0, 30)}...
+              </div>
+            )}
+          </div>
+        ) : (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+            Not processed
+          </span>
+        )}
+      </td>
+      <td className="px-6 py-4 text-zinc-600">
+        {formatFileSize(doc.size_bytes)}
+      </td>
+      <td className="px-6 py-4 text-zinc-600">
+        {formatDate(doc.created_at)}
+      </td>
+      <td className="px-6 py-4 text-zinc-600">
+        {formatDate(doc.updated_at)}
+      </td>
+      <td className="px-6 py-4 text-right">
+        <div className="flex justify-end gap-2">
+          {/* Chat button - only show if processed */}
+          {doc.is_ready_for_chat && (
+            <button
+              onClick={() => onChatWithDocument(doc.id, doc.filename)}
+              className="text-purple-600 hover:text-purple-800"
+              title="Chat with AI about this document"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+            </button>
+          )}
+          
+          {/* Process button - only show if not processed or failed */}
+          {(!doc.processing_status || doc.processing_status.status === 'failed') && (
+            <button
+              onClick={() => onProcessDocument(doc.id)}
+              disabled={processingDocuments.has(doc.id)}
+              className="text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Process document for AI chat"
+            >
+              {processingDocuments.has(doc.id) ? (
+                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+              )}
+            </button>
+          )}
+          
+          <button
+            onClick={() => onViewDetails(doc.id)}
+            className="text-blue-600 hover:text-blue-800"
+            title="View Details"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+          </button>
+          <button
+            onClick={() => onDownload(doc)}
+            className="text-green-600 hover:text-green-800"
+            title="Download"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+          </button>
+          <button
+            onClick={() => onDelete(doc.id)}
+            className="text-red-600 hover:text-red-800"
+            title="Delete"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        </div>
+      </td>
+    </tr>
+  ));
   
   if (loading && documents.length === 0) {
     return (
@@ -316,129 +466,18 @@ const DocumentList = () => {
             </thead>
             <tbody className="divide-y divide-zinc-200">
               {documents.map((doc) => (
-                <tr key={doc.id} className="hover:bg-zinc-50">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center">
-                      <div className="text-zinc-800 font-medium truncate max-w-[200px]">
-                        {doc.filename}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    {doc.processing_status ? (
-                      <div className="space-y-1">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          doc.processing_status.status === 'completed' 
-                            ? 'bg-green-100 text-green-800'
-                            : doc.processing_status.status === 'failed'
-                            ? 'bg-red-100 text-red-800'
-                            : doc.processing_status.status === 'processing'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {doc.processing_status.status.charAt(0).toUpperCase() + doc.processing_status.status.slice(1)}
-                        </span>
-                        {doc.processing_status.status === 'processing' && (
-                          <div className="w-full bg-gray-200 rounded-full h-1">
-                            <div 
-                              className="bg-blue-600 h-1 rounded-full transition-all duration-300"
-                              style={{ width: `${doc.processing_status.progress_percentage}%` }}
-                            ></div>
-                          </div>
-                        )}
-                        {doc.processing_status.status === 'completed' && (
-                          <div className="text-xs text-green-600">
-                            Ready for chat
-                          </div>
-                        )}
-                        {doc.processing_status.status === 'failed' && doc.processing_status.error_message && (
-                          <div className="text-xs text-red-600" title={doc.processing_status.error_message}>
-                            Error: {doc.processing_status.error_message.substring(0, 30)}...
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                        Not processed
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-zinc-600">
-                    {formatFileSize(doc.size_bytes)}
-                  </td>
-                  <td className="px-6 py-4 text-zinc-600">
-                    {formatDate(doc.created_at)}
-                  </td>
-                  <td className="px-6 py-4 text-zinc-600">
-                    {formatDate(doc.updated_at)}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2">
-                      {/* Chat button - only show if processed */}
-                      {doc.is_ready_for_chat && (
-                        <button
-                          onClick={() => handleChatWithDocument(doc.id, doc.filename)}
-                          className="text-purple-600 hover:text-purple-800"
-                          title="Chat with AI about this document"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                          </svg>
-                        </button>
-                      )}
-                      
-                      {/* Process button - only show if not processed or failed */}
-                      {(!doc.processing_status || doc.processing_status.status === 'failed') && (
-                        <button
-                          onClick={() => handleProcessDocument(doc.id)}
-                          disabled={processingDocuments.has(doc.id)}
-                          className="text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                          title="Process document for AI chat"
-                        >
-                          {processingDocuments.has(doc.id) ? (
-                            <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                          ) : (
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                            </svg>
-                          )}
-                        </button>
-                      )}
-                      
-                      <button
-                        onClick={() => handleViewDetails(doc.id)}
-                        className="text-blue-600 hover:text-blue-800"
-                        title="View Details"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => handleDownload(doc)}
-                        className="text-green-600 hover:text-green-800"
-                        title="Download"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => handleDelete(doc.id)}
-                        className="text-red-600 hover:text-red-800"
-                        title="Delete"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                <DocumentRow 
+                  key={doc.id}
+                  doc={doc}
+                  processingDocuments={processingDocuments}
+                  onDownload={handleDownload}
+                  onDelete={handleDelete}
+                  onViewDetails={handleViewDetails}
+                  onProcessDocument={handleProcessDocument}
+                  onChatWithDocument={handleChatWithDocument}
+                  formatDate={formatDate}
+                  formatFileSize={formatFileSize}
+                />
               ))}
             </tbody>
           </table>
