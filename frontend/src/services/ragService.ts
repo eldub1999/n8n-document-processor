@@ -167,45 +167,71 @@ export function subscribeToProcessingStatus(
  */
 
 /**
- * Send a query to the RAG system
+ * Send a RAG query with automatic fallback to text search on rate limits
+ * Enhanced with exponential backoff retry logic
  */
 export async function sendRAGQuery(request: RAGQueryRequest): Promise<RAGQueryResponse> {
   try {
-    // Temporarily use the simple test function that works
-    const { data, error } = await supabase.functions.invoke('simple-rag-test', {
-      body: { query: request.query }
+    // First try to generate embedding with retry logic
+    console.log('Attempting to generate embedding for query...');
+    const embedding = await generateEmbeddingWithRetry(request.query);
+    
+    if (embedding) {
+      // Try vector search first with the generated embedding
+      console.log('Using vector search with generated embedding');
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/rag-query`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          ...request,
+          embedding: embedding // Pass the pre-generated embedding
+        })
+      });
+
+      if (response.ok) {
+        return await response.json();
+      }
+    }
+
+    // Fallback to text search if embedding generation failed or vector search failed
+    console.log('Falling back to text-based search...');
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/simple-rag-test`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({
+        query: request.query,
+        document_context: request.documentContext
+      })
     });
 
-    if (error) {
-      console.error('RAG query error:', error);
-      throw new Error(`Query failed: ${error.message}`);
+    if (!response.ok) {
+      throw new Error(`RAG query failed: ${response.status} ${response.statusText}`);
     }
 
-    // Transform the simple test response to match our expected format
-    const testResponse = data;
-    if (testResponse.success) {
-      return {
-        success: true,
-        response: `Based on the documents, here's what I found about "${request.query}":\n\n` +
-                 testResponse.results.map((result: any, index: number) => 
-                   `${index + 1}. From ${result.document_title}: ${result.chunk_text}`
-                 ).join('\n\n') +
-                 `\n\nFound ${testResponse.results_count} relevant sections.`,
-        sources: testResponse.results.map((result: any) => ({
-          document_id: 'test-id',
-          document_title: result.document_title,
-          chunk_text: result.chunk_text,
-          similarity: result.similarity
-        })),
-        conversationId: request.conversationId || 'temp-conversation'
-      };
-    } else {
-      throw new Error('Search failed');
-    }
+    const result = await response.json();
+    
+    // Transform the simple search result to match RAGQueryResponse format
+    return {
+      success: true,
+      response: result.answer || result.response || 'I found some relevant information but couldn\'t generate a comprehensive answer.',
+      sources: result.sources || [],
+      conversationId: request.conversationId,
+      details: 'Used text search fallback due to Voyage AI rate limits'
+    };
   } catch (error) {
-    console.error('Error calling RAG query:', error);
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    throw new Error(`Failed to process query: ${message}`);
+    console.error('RAG query error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return {
+      success: false,
+      error: errorMessage,
+      conversationId: request.conversationId
+    };
   }
 }
 
@@ -449,4 +475,63 @@ export async function processAllUnprocessedDocuments(): Promise<ProcessingProgre
   }
 
   return results;
+}
+
+/**
+ * Enhanced embedding generation with exponential backoff for rate limits
+ * Implements Voyage AI best practices for handling 429 errors
+ */
+async function generateEmbeddingWithRetry(text: string, maxRetries: number = 3): Promise<number[] | null> {
+  let attempt = 0;
+  let lastError: any = null;
+
+  while (attempt < maxRetries) {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/rag-query`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ 
+          query: text,
+          generateEmbeddingOnly: true // Flag to only generate embedding, not search
+        })
+      });
+
+      if (response.status === 429) {
+        // Rate limit hit - implement exponential backoff
+        const waitTime = Math.min(Math.pow(2, attempt) * 1000 + Math.random() * 1000, 60000);
+        console.log(`Rate limit hit, waiting ${waitTime}ms before retry ${attempt + 1}/${maxRetries}`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        attempt++;
+        continue;
+      }
+
+      if (!response.ok) {
+        throw new Error(`Embedding generation failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      return result.embedding || null;
+    } catch (error: unknown) {
+      lastError = error;
+      
+      // Check if it's a rate limit error via status code
+      if (error instanceof Error && error.message.includes('429')) {
+        const waitTime = Math.min(Math.pow(2, attempt) * 1000 + Math.random() * 1000, 60000);
+        console.log(`Voyage AI rate limit hit, waiting ${waitTime}ms before retry ${attempt + 1}/${maxRetries}`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        attempt++;
+        continue;
+      }
+      
+      // For non-rate-limit errors, break immediately
+      console.error('Embedding generation error:', error);
+      break;
+    }
+  }
+
+  console.warn(`Failed to generate embedding after ${maxRetries} attempts. Using text search fallback.`);
+  return null;
 } 

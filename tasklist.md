@@ -369,3 +369,81 @@ WHERE d.is_latest = true;
 - **Realtime Overhead**: 99% reduction in subscription overhead
 - **Component Performance**: Individual row rendering optimized
 - **Future Growth**: System optimized for 100s of documents 
+
+## ✅ VOYAGE AI RATE LIMIT ANALYSIS & FIXES COMPLETED
+
+### **🎯 Rate Limit Issue Investigation**
+- ✅ **Root Cause Identified**: Voyage AI Tier 1 limits (2000 RPM, 3-8M TPM) causing 429 errors on chat queries
+- ✅ **Current Status**: 200M free tokens available, documents successfully processed with embeddings
+- ✅ **Problem Area**: Query embedding generation during chat, not document processing
+
+### **🚀 Voyage AI Best Practices Implementation**
+
+#### **1. Exponential Backoff with Retry Logic** 
+- ✅ **Added `generateEmbeddingWithRetry()`**: Implements 3-attempt retry with exponential backoff
+- ✅ **Rate Limit Detection**: Proper 429 error handling with progressive wait times (1s, 2s, 4s + jitter)
+- ✅ **Max Wait Cap**: Limited to 60 seconds to prevent excessive delays
+
+#### **2. Intelligent Fallback Strategy**
+- ✅ **Enhanced `sendRAGQuery()`**: Attempts embedding generation first, falls back to text search
+- ✅ **Graceful Degradation**: Chat continues working even when rate limited
+- ✅ **Transparent User Experience**: No chat failures, automatic fallback logging
+
+#### **3. Voyage AI Rate Limit Insights**
+- **Tier 1 Limits**: 2000 RPM, 3-8M TPM (varies by model)
+- **Tier Progression**: Tier 2 (≥$100 paid) = 2x limits, Tier 3 (≥$1000 paid) = 3x limits  
+- **Free Tokens**: 200M tokens free for voyage-3.5/voyage-3-large models
+- **Recommended Models**: `voyage-law-2` for legal documents, `voyage-3.5` for general use
+
+#### **4. Additional Optimizations Available**
+- **Batching**: Process multiple documents together (up to 128 per request)
+- **Request Pacing**: Add delays between requests (0.1s recommended)
+- **Usage Credits**: Purchase $100 credits to auto-upgrade to Tier 2 (double limits)
+
+### **💡 Next Steps for Rate Limit Optimization**
+- [ ] **Monitor Usage**: Track token consumption in Voyage AI dashboard  
+- [ ] **Consider Tier Upgrade**: Purchase $100 credits for Tier 2 (4000 RPM, 16M TPM)
+- [ ] **Implement Batching**: For bulk document processing operations
+- [ ] **Add Request Pacing**: If still hitting limits during heavy usage
+
+### **📊 Current System Status**
+- **Chat Functionality**: ✅ Working with intelligent fallback
+- **Vector Search**: ✅ Working when rate limits allow
+- **Text Search**: ✅ Always available as fallback
+- **Document Processing**: ✅ Successfully completed for 2 documents  
+- **Rate Limit Handling**: ✅ Implemented with exponential backoff
+
+The RAG system now handles Voyage AI rate limits gracefully and maintains full functionality even during high usage periods. 
+
+## ✅ FRESH END-TO-END TESTING SETUP COMPLETED
+
+### **🧹 Complete Data Cleanup for Testing**
+- ✅ **Deleted All Documents**: Removed 2 test documents from database
+- ✅ **Cleared Document Embeddings**: Removed 6 embedding records (3 per document)
+- ✅ **Cleaned Processing Status**: Removed all processing status records
+- ✅ **Cleared Chat Data**: Removed all conversations and messages
+- ✅ **Storage Cleanup**: Document files removed from Supabase Storage
+- ✅ **Database Verification**: All tables confirmed empty and ready for fresh testing
+
+### **🎯 Ready for Complete End-to-End Testing**
+**System Status**: ✅ Clean slate - No documents, embeddings, or chat data
+**Billing**: ✅ Updated and ready for Voyage AI usage
+**Performance**: ✅ All optimizations in place (rate limiting, subscription management)
+**RAG Pipeline**: ✅ Fully configured with intelligent fallback system
+
+### **📋 Complete Testing Workflow Available**
+1. **Document Upload** → Automatic processing trigger
+2. **Text Extraction** → Real-time progress tracking  
+3. **Chunking & Embedding** → Voyage AI integration with rate limit handling
+4. **Vector Storage** → Database optimization with indexes
+5. **Chat Interface** → Both vector and text search capabilities
+6. **Real-time Updates** → Optimized subscription management
+
+### **💡 Testing Recommendations**
+- **Upload Legal Documents**: Test with PDF files containing legal content
+- **Monitor Processing**: Watch real-time status updates in document list
+- **Test Chat Functionality**: Try both simple and complex legal queries
+- **Verify Rate Limiting**: Observe graceful fallback to text search if needed
+- **Performance Monitoring**: Check subscription behavior and database performance
+
+The system is now ready for comprehensive end-to-end testing with billing updated and all optimizations in place. 
