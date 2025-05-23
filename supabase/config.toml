@@ -312,12 +312,3 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # Configure JWT verification for specific functions
 [functions.document-validation]
 verify_jwt = false
-
-[functions.document-processing]
-verify_jwt = false
-
-[functions.simple-test]
-verify_jwt = false
-
-[functions.bypass-auth]
-verify_jwt = false
