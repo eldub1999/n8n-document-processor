@@ -12,10 +12,9 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 interface RAGQueryRequest {
   query: string;
   conversationId?: string;
-  documentContext?: string[];
+  jurisdictions?: string[];
+  documentTypes?: string[];
   maxResults?: number;
-  jurisdiction?: string;
-  documentType?: string;
 }
 
 interface RAGQueryResponse {
@@ -50,13 +49,12 @@ async function getApiKey(keyName: string): Promise<string> {
 async function semanticSearch(
   query: string, 
   supabase: any, 
-  documentContext?: string[],
-  jurisdiction?: string,
-  documentType?: string,
+  jurisdictions?: string[],
+  documentTypes?: string[],
   maxResults: number = 10
 ) {
   try {
-    console.log('🔍 Performing semantic search...');
+    console.log('🔍 Performing semantic search with filters:', { jurisdictions, documentTypes });
     
     // Generate embedding for the query using Voyage AI (FIXED: corrected API key name)
     const voyageApiKey = await getApiKey('voyage_ai_api_key');
@@ -80,14 +78,16 @@ async function semanticSearch(
     const embeddingData = await embeddingResponse.json();
     const queryEmbedding = embeddingData.data[0].embedding;
     
-    // Note: Current search function doesn't support metadata filtering
-    // TODO: Enhance search function to support jurisdiction, documentType, documentContext filters
-    
-    // Perform vector similarity search
+    // Perform vector similarity search with metadata filters
+    // TODO: Ensure the 'search_similar_embeddings' RPC can handle these new filters
+    // or create/update a new RPC/database function.
     const { data: searchResults, error } = await supabase.rpc('search_similar_embeddings', {
       query_embedding: queryEmbedding,
-      match_threshold: 0.5,
-      match_count: maxResults
+      match_threshold: 0.5, 
+      match_count: maxResults,
+      filter_jurisdictions: jurisdictions,
+      filter_document_types: documentTypes,
+      include_national: true
     });
     
     if (error) {
@@ -116,7 +116,7 @@ async function semanticSearch(
   } catch (error) {
     console.error('Semantic search failed:', error);
     // Fallback to text search
-    return await textSearch(query, supabase, documentContext, jurisdiction, documentType, maxResults);
+    return await textSearch(query, supabase, jurisdictions, documentTypes, maxResults);
   }
 }
 
@@ -124,12 +124,11 @@ async function semanticSearch(
 async function textSearch(
   query: string,
   supabase: any,
-  documentContext?: string[],
-  jurisdiction?: string,
-  documentType?: string,
+  jurisdictions?: string[],
+  documentTypes?: string[],
   maxResults: number = 10
 ) {
-  console.log('📝 Falling back to text search...');
+  console.log('📝 Falling back to text search with filters:', { jurisdictions, documentTypes });
   
   let queryBuilder = supabase
     .from('document_embeddings')
@@ -147,17 +146,16 @@ async function textSearch(
     .textSearch('chunk_text', query)
     .limit(maxResults);
   
-  // Apply metadata filters
-  if (documentContext && documentContext.length > 0) {
-    queryBuilder = queryBuilder.in('document_id', documentContext);
+  if (documentTypes && documentTypes.length > 0) {
+    queryBuilder = queryBuilder.in('documents.document_type', documentTypes);
   }
-  
-  if (jurisdiction) {
-    queryBuilder = queryBuilder.eq('documents.jurisdiction', jurisdiction);
-  }
-  
-  if (documentType) {
-    queryBuilder = queryBuilder.eq('documents.document_type', documentType);
+
+  if (jurisdictions && jurisdictions.length > 0) {
+    // Filter for selected states OR 'national'
+    queryBuilder = queryBuilder.or(`jurisdiction.in.(${jurisdictions.map(j => `"${j}"`).join(',')}),jurisdiction.eq.national`, { referencedTable: 'documents' });
+  } else {
+    // If no specific jurisdictions, only include 'national'
+    queryBuilder = queryBuilder.eq('documents.jurisdiction', 'national');
   }
   
   const { data, error } = await queryBuilder;
@@ -171,99 +169,17 @@ async function textSearch(
   return data || [];
 }
 
-// Generate response using Claude Sonnet 4 on Vertex AI
-async function generateClaudeResponse(query: string, context: any[]): Promise<string> {
-  console.log('🤖 Generating Claude Sonnet 4 response...');
-  
-  if (!context || context.length === 0) {
-    return "I apologize, but I couldn't find any relevant information in the available legal documents to answer your question. Please try rephrasing your query or check if documents for your jurisdiction are available.";
-  }
-  
-  // Format context for Claude
-  const formattedContext = context.map((chunk, index) => {
-    const doc = chunk.documents || chunk.document;
-    return `[Document ${index + 1}: ${doc?.filename || 'Unknown'} - ${doc?.jurisdiction || 'Unknown'} ${doc?.county ? `County: ${doc.county}` : ''}]
-${chunk.chunk_text}`;
-  }).join('\n\n---\n\n');
-  
-  const systemPrompt = `You are an expert legal research assistant specializing in real estate law, title and escrow procedures, and regulatory compliance. You have access to a comprehensive database of legal documents including statutes, regulations, and procedural guides.
-
-**Your Role:**
-- Provide accurate, well-researched legal information based on the provided documents
-- Cite specific sources when referencing information
-- Acknowledge limitations when information is incomplete
-- Use clear, professional language appropriate for legal professionals
-- Focus on practical applications and procedural guidance
-
-**Important Guidelines:**
-- Always cite which documents your information comes from
-- If information conflicts between sources, note the discrepancy
-- Distinguish between mandatory requirements and best practices
-- Include relevant jurisdiction information when applicable
-- Do not provide legal advice - only informational content
-
-**Response Format:**
-1. Direct answer to the question
-2. Supporting details from the documents
-3. Source citations
-4. Any relevant warnings or considerations`;
-
-  const userPrompt = `Based on the following legal documents, please answer this question: "${query}"
-
-**Available Context:**
-${formattedContext}
-
-Please provide a comprehensive response based on the available information, citing specific sources where appropriate.`;
-
-  try {
-    // Use Vertex AI Claude Sonnet 4 endpoint
-    const response = await fetch(
-      `https://us-central1-aiplatform.googleapis.com/v1/projects/vertex-ai-for-rag/locations/us-central1/publishers/anthropic/models/claude-sonnet-4@20250514:generateMessage`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${await getGoogleCloudAccessToken()}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          anthropic_version: "bedrock-2023-05-31",
-          max_tokens: 4000,
-          temperature: 0.1,
-          system: systemPrompt,
-          messages: [
-            {
-              role: "user",
-              content: userPrompt
-            }
-          ]
-        })
-      }
-    );
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Claude API error:', response.status, errorText);
-      throw new Error(`Claude API failed: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    const content = data.content?.[0]?.text || data.completion || "I apologize, but I couldn't generate a response at this time.";
-    
-    console.log('✅ Claude response generated successfully');
-    return content;
-    
-  } catch (error) {
-    console.error('Claude response generation failed:', error);
-    return `I apologize, but I'm experiencing technical difficulties generating a response. Please try again in a moment. Error: ${error.message}`;
-  }
-}
-
-// Get Google Cloud access token using service account
-async function getGoogleCloudAccessToken(): Promise<string> {
+// Get Google Cloud access token and project ID using service account
+async function getGoogleCloudCredentials(): Promise<{accessToken: string, projectId: string}> {
   try {
     const serviceAccountJson = await getApiKey('google_service_account_json');
     const serviceAccount = JSON.parse(serviceAccountJson);
-    
+    const projectId = serviceAccount.project_id; // Extract project_id
+
+    if (!projectId) {
+      throw new Error('Project ID not found in service account JSON.');
+    }
+
     // Create JWT for Google Cloud authentication
     const header = {
       alg: 'RS256',
@@ -328,11 +244,91 @@ async function getGoogleCloudAccessToken(): Promise<string> {
     }
     
     const tokenData = await tokenResponse.json();
-    return tokenData.access_token;
+    return { accessToken: tokenData.access_token, projectId }; // Return projectId
+
+  } catch (error) {
+    console.error('Failed to get Google Cloud credentials:', error);
+    throw new Error(`Authentication or project ID retrieval failed: ${error.message}`);
+  }
+}
+
+// TEMPORARY: Using Gemini 1.5 Flash for testing LLM response generation via Vertex AI
+async function generateLLMResponse_GeminiTest(query: string, context: any[]): Promise<string> {
+  console.log('🤖 Generating Gemini 1.5 Flash response...');
+  
+  if (!context || context.length === 0) {
+    return "I apologize, but I couldn't find any relevant information in the available legal documents to answer your question. Please try rephrasing your query or check if documents for your jurisdiction are available.";
+  }
+  
+  const formattedContext = context.map((chunk, index) => {
+    const doc = chunk.documents || chunk.document;
+    return `[Document ${index + 1}: ${doc?.filename || 'Unknown'} - ${doc?.jurisdiction || 'Unknown'} ${doc?.county ? `County: ${doc.county}` : ''}]\n${chunk.chunk_text}`;
+  }).join('\n\n---\n\n');
+  
+  // Simplified combined prompt for Gemini
+  const combinedPrompt = `You are an expert legal research assistant. Based on the following legal documents, please answer this question: "${query}"
+
+**Available Context:**
+${formattedContext}
+
+Please provide a comprehensive response based on the available information, citing specific sources where appropriate. Focus on accuracy and clarity.`;
+
+  try {
+    const { accessToken, projectId } = await getGoogleCloudCredentials();
+
+    const geminiApiUrl = `https://us-central1-aiplatform.googleapis.com/v1/projects/${projectId}/locations/us-central1/publishers/google/models/gemini-1.5-flash-latest:generateContent`;
+    
+    const requestBody = {
+      contents: [
+        {
+          role: "user", 
+          parts: [
+            { text: combinedPrompt }
+          ]
+        }
+      ],
+      generationConfig: {
+        temperature: 0.2, // Adjust as needed
+        maxOutputTokens: 4096 // Adjust as needed
+      },
+      // Basic safety settings - adjust as per requirements
+      safetySettings: [
+        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+      ]
+    };
+
+    const response = await fetch(geminiApiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody)
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Gemini API error:', response.status, errorText);
+      throw new Error(`Gemini API failed: ${response.status} - ${errorText}`);
+    }
+    
+    const data = await response.json();
+    
+    // Extract text from Gemini response
+    const rawContent = data.candidates?.[0]?.content?.parts?.[0]?.text || 
+                  "I apologize, but I couldn't generate a response from Gemini at this time.";
+    
+    const content = "GEMINI_RESPONSE_PREFIX_TEST: " + rawContent;
+
+    console.log('✅ Gemini response generated successfully with prefix.');
+    return content;
     
   } catch (error) {
-    console.error('Failed to get Google Cloud access token:', error);
-    throw new Error(`Authentication failed: ${error.message}`);
+    console.error('Gemini response generation failed:', error);
+    return `I apologize, but I'm experiencing technical difficulties generating a response. Please try again in a moment. Error: ${error.message}`;
   }
 }
 
@@ -396,7 +392,7 @@ async function storeConversation(
         role: 'assistant',
         content: response,
         message_metadata: {
-          model: 'claude-sonnet-4',
+          model: 'gemini-1.5-flash-latest',
           source_count: sources.length
         },
         document_sources: sources.map(s => s.document_id || s.documents?.id).filter(Boolean),
@@ -422,40 +418,39 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { query, conversationId, documentContext, maxResults, jurisdiction, documentType }: RAGQueryRequest = await req.json();
+    const { query, conversationId, jurisdictions, documentTypes, maxResults }: RAGQueryRequest = await req.json();
 
     if (!query?.trim()) {
       throw new Error('Query is required');
     }
 
     console.log('🚀 Processing RAG query:', query);
-    console.log('📍 Filters:', { jurisdiction, documentType, documentContext });
+    console.log('📍 Filters:', { jurisdictions, documentTypes });
 
     // Perform semantic search with metadata filtering
     const searchResults = await semanticSearch(
       query,
       supabase,
-      documentContext,
-      jurisdiction,
-      documentType,
+      jurisdictions,
+      documentTypes,
       maxResults || 10
     );
 
-    // Generate response using Claude Sonnet 4
-    const response = await generateClaudeResponse(query, searchResults);
+    // Generate response using LLM (now Gemini for testing)
+    const llmResponse = await generateLLMResponse_GeminiTest(query, searchResults);
 
     // Store conversation
     const finalConversationId = await storeConversation(
       supabase,
       query,
-      response,
+      llmResponse,
       searchResults,
       conversationId
     );
 
     const result: RAGQueryResponse = {
       success: true,
-      response,
+      response: llmResponse,
       sources: searchResults.map(chunk => ({
         document_id: chunk.document_id || chunk.documents?.id,
         filename: chunk.documents?.filename || chunk.document?.filename,
@@ -466,7 +461,7 @@ serve(async (req) => {
         chunk_index: chunk.chunk_index
       })),
       conversationId: finalConversationId,
-      details: `Processed with Claude Sonnet 4. Found ${searchResults.length} relevant sources.`
+      details: `Processed with Gemini 1.5 Flash. Found ${searchResults.length} relevant sources.`
     };
 
     return new Response(JSON.stringify(result), {

@@ -28,24 +28,31 @@
 - **Version**: 8 (Latest)
 - **Entrypoint**: `/Users/laudon/Software Development/Cursor/n8n-workflow-test/supabase/functions/document-processor/index.ts`
 
-### 2. `rag-chat` ❌ **HAS BUGS - NEEDS FIXING**
-- **Status**: ACTIVE, Has critical bugs
+### 2. `rag-chat` ✅ **FIXES DEPLOYED - PENDING TESTING**
+- **Status**: ACTIVE. Critical bug fixes and enhancements deployed.
 - **Purpose**: Main RAG query processing and chat interface
 - **Features**:
-  - Semantic search with VoyageAI embeddings
-  - Text search fallback
-  - Claude Sonnet 4 response generation
+  - Semantic search with VoyageAI embeddings (and metadata filter pass-through)
+  - Text search fallback (with corrected select string)
+  - Claude 3 Sonnet (`claude-3-sonnet@20240229`) response generation via Vertex AI (using dynamic Project ID)
   - Conversation storage and management
-- **Critical Bugs**:
-  - API key name mismatch: calls `voyage_api_key` but should be `voyage_ai_api_key`
-  - Search result transformation issues
-- **Dependencies**: VoyageAI, Claude (Vertex AI), Supabase
+- **Fixes Deployed (v7)**:
+  - Corrected API key name: `voyage_api_key` → `voyage_ai_api_key`.
+  - Lowered similarity threshold to `0.5`.
+  - Corrected Base64 decoding: `Deno.atob` → `atob`.
+  - Vertex AI calls now use dynamic `project_id` from service account.
+  - `semanticSearch` results now correctly include `jurisdiction`, `county`, `document_type`.
+  - `textSearch` select string parsing error resolved.
+  - Updated Claude model ID to `claude-3-sonnet@20240229` and adjusted API payload.
+- **Current Debug Status**:
+  - Fixes deployed in version 7. End-to-end testing is now required to verify resolution of previous 404 errors and overall functionality.
+- **Dependencies**: VoyageAI, Anthropic Claude (via Vertex AI), Supabase
 - **JWT Verification**: Yes
-- **Version**: 3
+- **Version**: 7
 - **Entrypoint**: `index.ts`
 
-### 3. `document-validation` ⚠️ **OPTIONAL - KEEP FOR NOW**
-- **Status**: ACTIVE, Working
+### 3. `document-validation` ⚠️ **OPTIONAL - KEEP FOR NOW - SUSPECTED TRIGGER ISSUE**
+- **Status**: ACTIVE, Working (but potentially not being invoked)
 - **Purpose**: Document upload validation and deduplication
 - **Features**:
   - File type and size validation
@@ -55,6 +62,10 @@
 - **JWT Verification**: Yes
 - **Version**: 14
 - **Entrypoint**: `index.ts`
+- **Current Debug Status (System Test - PAUSED)**:
+  - **Suspected Issue**: This function may not be correctly triggered by Supabase Storage upon new file uploads.
+  - **Symptoms**: After a successful file upload (record created in `documents` table), no corresponding record is created in `document_processing_status`, and no logs appear for this function or `document-processor`.
+  - **Next Step**: When system testing resumes, verify and fix the Supabase Storage trigger configuration for this function.
 
 ---
 
