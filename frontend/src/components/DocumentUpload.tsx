@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { uploadDocument } from '../services/documentService';
+import { processDocument, subscribeToProcessingStatus } from '../services/ragService';
+import type { DocumentProcessingStatus } from '../types/rag';
 import { toaster } from '../services/toast';
 import { getCountiesByJurisdiction, hasCountyData } from '../services/countyService';
 import type { DocumentUpload as DocumentUploadType } from '../types/document';
@@ -20,6 +22,10 @@ const DocumentUpload = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [countyDropdownOpen, setCountyDropdownOpen] = useState(false);
+  
+  // RAG processing state
+  const [processingStatus, setProcessingStatus] = useState<DocumentProcessingStatus | null>(null);
+  const [showProcessingStatus, setShowProcessingStatus] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
@@ -129,14 +135,53 @@ const DocumentUpload = () => {
         document_type: documentType || undefined,
       };
       
-      await uploadDocument(documentData);
+      // Upload the document
+      const uploadedDocument = await uploadDocument(documentData);
       
       toaster.create({
         title: 'Success',
-        description: 'Document uploaded successfully',
+        description: 'Document uploaded successfully. Processing for AI search...',
       });
       
-      navigate('/documents');
+      // Start RAG processing
+      setShowProcessingStatus(true);
+      
+      try {
+        // Subscribe to processing status updates
+        const unsubscribe = subscribeToProcessingStatus(uploadedDocument.id, (status) => {
+          setProcessingStatus(status);
+          
+          if (status?.status === 'completed') {
+            toaster.create({
+              title: 'Processing Complete',
+              description: 'Document is now ready for AI-powered search and chat!',
+            });
+            // Auto-navigate after a short delay to let user see the completion message
+            setTimeout(() => navigate('/documents'), 2000);
+          } else if (status?.status === 'failed') {
+            toaster.create({
+              title: 'Processing Failed',
+              description: 'Document uploaded but AI processing failed. You can retry processing later.',
+            });
+          }
+        });
+        
+        // Trigger processing
+        await processDocument(uploadedDocument.id);
+        
+        // Clean up subscription when component unmounts or processing completes
+        return unsubscribe;
+        
+      } catch (processingError) {
+        console.error('Error starting document processing:', processingError);
+        toaster.create({
+          title: 'Processing Error',
+          description: 'Document uploaded but AI processing could not be started.',
+        });
+        // Still navigate to documents page since upload succeeded
+        setTimeout(() => navigate('/documents'), 1000);
+      }
+      
     } catch (err) {
       console.error('Error uploading document:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to upload document';
@@ -533,6 +578,78 @@ const DocumentUpload = () => {
             </p>
           </div>
         </div>
+        
+        {/* Processing Status Display */}
+        {showProcessingStatus && processingStatus && (
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-blue-900">
+                AI Processing Status
+              </h3>
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                processingStatus.status === 'completed' 
+                  ? 'bg-green-100 text-green-800'
+                  : processingStatus.status === 'failed'
+                  ? 'bg-red-100 text-red-800'
+                  : processingStatus.status === 'processing'
+                  ? 'bg-yellow-100 text-yellow-800'
+                  : 'bg-gray-100 text-gray-800'
+              }`}>
+                {processingStatus.status.charAt(0).toUpperCase() + processingStatus.status.slice(1)}
+              </span>
+            </div>
+            
+            {/* Progress Bar */}
+            <div className="mb-3">
+              <div className="flex justify-between text-xs text-blue-700 mb-1">
+                <span>
+                  {processingStatus.stage && `Stage: ${processingStatus.stage.replace(/_/g, ' ')}`}
+                </span>
+                <span>{processingStatus.progress_percentage}%</span>
+              </div>
+              <div className="w-full bg-blue-100 rounded-full h-2">
+                <div 
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    processingStatus.status === 'completed' 
+                      ? 'bg-green-600' 
+                      : processingStatus.status === 'failed'
+                      ? 'bg-red-600'
+                      : 'bg-blue-600'
+                  }`}
+                  style={{ width: `${processingStatus.progress_percentage}%` }}
+                ></div>
+              </div>
+            </div>
+            
+            {/* Processing Details */}
+            <div className="text-xs text-blue-700 space-y-1">
+              {processingStatus.total_chunks > 0 && (
+                <div>
+                  Chunks: {processingStatus.processed_chunks} / {processingStatus.total_chunks} processed
+                </div>
+              )}
+              {processingStatus.status === 'completed' && (
+                <div className="text-green-700 font-medium">
+                  ✅ Document is ready for AI-powered search and chat!
+                </div>
+              )}
+              {processingStatus.status === 'failed' && processingStatus.error_message && (
+                <div className="text-red-700 font-medium">
+                  ❌ Error: {processingStatus.error_message}
+                </div>
+              )}
+              {processingStatus.status === 'processing' && (
+                <div className="flex items-center text-blue-700">
+                  <svg className="animate-spin -ml-1 mr-2 h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Processing document for AI search...
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         
         <div className="mt-8 flex flex-col sm:flex-row sm:justify-end gap-3">
           <button

@@ -10,6 +10,7 @@ const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const DocumentsPage = lazy(() => import('./pages/DocumentsPage'));
 const DocumentDetailPage = lazy(() => import('./pages/DocumentDetailPage'));
 const UploadPage = lazy(() => import('./pages/UploadPage'));
+const ChatPage = lazy(() => import('./pages/ChatPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const TailwindTestPage = lazy(() => import('./pages/TailwindTestPage'));
 
@@ -33,6 +34,7 @@ function App() {
               <Route path="documents" element={<DocumentsPage />} />
               <Route path="documents/:id" element={<DocumentDetailPage />} />
               <Route path="upload" element={<UploadPage />} />
+              <Route path="chat" element={<ChatPage />} />
               <Route path="tailwind-test" element={<TailwindTestPage />} />
               <Route path="404" element={<NotFoundPage />} />
               <Route path="*" element={<Navigate to="/404" replace />} />

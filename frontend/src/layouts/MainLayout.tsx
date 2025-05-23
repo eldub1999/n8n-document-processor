@@ -38,6 +38,12 @@ export function MainLayout() {
                       My Documents
                     </button>
                     <button 
+                      onClick={() => navigate('/chat')} 
+                      className="px-4 py-2 text-blue-600 hover:bg-zinc-100 rounded-md transition-colors"
+                    >
+                      AI Chat
+                    </button>
+                    <button 
                       onClick={() => navigate('/upload')} 
                       className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                     >
