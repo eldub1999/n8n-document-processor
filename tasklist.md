@@ -150,19 +150,6 @@ const binaryKey = atob(keyData); // Or equivalent fix for service account key ha
 
 ---
 
-## 🔥 **IMMEDIATE NEXT STEPS (THIS SESSION)**
-
-**PRIMARY GOAL**: Conduct a full end-to-end system test starting from a completely clean data state to validate the stability and correctness of the entire workflow, especially the `rag-chat` v7 Edge Function. **CURRENTLY PAUSED due to document processing not initiating.**
-
-**PRIORITY ACTIONS (WHEN RESUMED)**:
-1. **❗ Verify/Fix Supabase Storage trigger for `document-validation` function.**
-2. **❗ Re-attempt document upload.**
-3. **❗ Monitor document processing (ensure `document_processing_status` is updated).**
-4. **❗ Test RAG functionality with the new documents.**
-5. **🧹 Clean Up Edge Functions (after RAG stability confirmed by this test).**
-
----
-
 ## ✅ COMPLETED TASKS (VERIFIED - CODE LEVEL)
 
 ### **Infrastructure & Authentication ✅**

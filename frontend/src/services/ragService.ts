@@ -471,7 +471,7 @@ async function generateEmbeddingWithRetry(text: string, maxRetries: number = 3):
 
   while (attempt < maxRetries) {
     try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/rag-query`, {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/rag-chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -479,7 +479,7 @@ async function generateEmbeddingWithRetry(text: string, maxRetries: number = 3):
         },
         body: JSON.stringify({ 
           query: text,
-          generateEmbeddingOnly: true // Flag to only generate embedding, not search
+          generateEmbeddingOnly: true // Flag to only generate embedding
         })
       });
 
