@@ -1,13 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getDocuments, deleteDocument, getDocumentUrl } from '../services/documentService';
+import { 
+  getDocumentsWithProcessingStatus, 
+  processDocument, 
+  subscribeToProcessingStatus 
+} from '../services/ragService';
 import { toaster } from '../services/toast';
 import type { Document, DocumentSearchParams } from '../types/document';
+import type { DocumentWithProcessingStatus } from '../types/rag';
 
 const DocumentList = () => {
-  const [documents, setDocuments] = useState<Document[]>([]);
+  const [documents, setDocuments] = useState<DocumentWithProcessingStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [processingDocuments, setProcessingDocuments] = useState<Set<string>>(new Set());
   const [searchParams, setSearchParams] = useState<DocumentSearchParams>({
     sortBy: 'created_at',
     sortOrder: 'desc',
@@ -26,8 +33,25 @@ const DocumentList = () => {
     try {
       setLoading(true);
       const docs = await getDocuments(searchParams);
-      setDocuments(docs);
+      
+      // Get processing status for all documents
+      const docsWithStatus = await getDocumentsWithProcessingStatus(docs.map(d => d.id));
+      setDocuments(docsWithStatus);
       setError(null);
+      
+      // Subscribe to status updates for processing documents
+      docsWithStatus.forEach(doc => {
+        if (doc.processing_status?.status === 'processing') {
+          subscribeToProcessingStatus(doc.id, (status) => {
+            setDocuments(prev => prev.map(d => 
+              d.id === doc.id 
+                ? { ...d, processing_status: status || undefined, is_ready_for_chat: status?.status === 'completed' || false } as DocumentWithProcessingStatus
+                : d
+            ));
+          });
+        }
+      });
+      
     } catch (err) {
       console.error('Error loading documents:', err);
       setError(err instanceof Error ? err.message : 'Failed to load documents');
@@ -40,9 +64,18 @@ const DocumentList = () => {
     }
   };
   
-  const handleDownload = async (doc: Document) => {
+  const handleDownload = async (doc: DocumentWithProcessingStatus) => {
     try {
-      const url = await getDocumentUrl(doc);
+      // Cast to Document type for getDocumentUrl
+      const docForDownload: Document = {
+        ...doc,
+        description: doc.description || null,
+        content_hash: doc.content_hash || null,
+        jurisdiction: doc.jurisdiction || null,
+        county: doc.county || null,
+        document_type: doc.document_type || null
+      };
+      const url = await getDocumentUrl(docForDownload);
       window.open(url, '_blank');
     } catch (err) {
       console.error('Error getting document URL:', err);
@@ -117,6 +150,39 @@ const DocumentList = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
   
+  const handleProcessDocument = async (documentId: string) => {
+    try {
+      setProcessingDocuments(prev => new Set(prev).add(documentId));
+      await processDocument(documentId);
+      
+      toaster.create({
+        title: 'Processing Started',
+        description: 'Document processing has been initiated. Check status for progress.',
+      });
+      
+      // Reload documents to get updated status
+      setTimeout(() => loadDocuments(), 1000);
+      
+    } catch (error) {
+      console.error('Error processing document:', error);
+      toaster.create({
+        title: 'Processing Failed',
+        description: 'Failed to start document processing. Please try again.',
+      });
+    } finally {
+      setProcessingDocuments(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(documentId);
+        return newSet;
+      });
+    }
+  };
+
+  const handleChatWithDocument = (documentId: string, filename: string) => {
+    // Navigate to chat with this document pre-selected
+    navigate(`/chat?doc=${documentId}&title=${encodeURIComponent(filename)}`);
+  };
+  
   if (loading && documents.length === 0) {
     return (
       <div className="flex justify-center items-center min-h-[200px]">
@@ -187,6 +253,9 @@ const DocumentList = () => {
                 <th className="px-6 py-3 font-medium text-sm cursor-pointer" onClick={() => handleSort('filename')}>
                   Filename {getSortIndicator('filename')}
                 </th>
+                <th className="px-6 py-3 font-medium text-sm">
+                  Processing Status
+                </th>
                 <th className="px-6 py-3 font-medium text-sm cursor-pointer" onClick={() => handleSort('size_bytes')}>
                   Size {getSortIndicator('size_bytes')}
                 </th>
@@ -209,6 +278,45 @@ const DocumentList = () => {
                       </div>
                     </div>
                   </td>
+                  <td className="px-6 py-4">
+                    {doc.processing_status ? (
+                      <div className="space-y-1">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          doc.processing_status.status === 'completed' 
+                            ? 'bg-green-100 text-green-800'
+                            : doc.processing_status.status === 'failed'
+                            ? 'bg-red-100 text-red-800'
+                            : doc.processing_status.status === 'processing'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {doc.processing_status.status.charAt(0).toUpperCase() + doc.processing_status.status.slice(1)}
+                        </span>
+                        {doc.processing_status.status === 'processing' && (
+                          <div className="w-full bg-gray-200 rounded-full h-1">
+                            <div 
+                              className="bg-blue-600 h-1 rounded-full transition-all duration-300"
+                              style={{ width: `${doc.processing_status.progress_percentage}%` }}
+                            ></div>
+                          </div>
+                        )}
+                        {doc.processing_status.status === 'completed' && (
+                          <div className="text-xs text-green-600">
+                            Ready for chat
+                          </div>
+                        )}
+                        {doc.processing_status.status === 'failed' && doc.processing_status.error_message && (
+                          <div className="text-xs text-red-600" title={doc.processing_status.error_message}>
+                            Error: {doc.processing_status.error_message.substring(0, 30)}...
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                        Not processed
+                      </span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 text-zinc-600">
                     {formatFileSize(doc.size_bytes)}
                   </td>
@@ -220,6 +328,40 @@ const DocumentList = () => {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
+                      {/* Chat button - only show if processed */}
+                      {doc.is_ready_for_chat && (
+                        <button
+                          onClick={() => handleChatWithDocument(doc.id, doc.filename)}
+                          className="text-purple-600 hover:text-purple-800"
+                          title="Chat with AI about this document"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                          </svg>
+                        </button>
+                      )}
+                      
+                      {/* Process button - only show if not processed or failed */}
+                      {(!doc.processing_status || doc.processing_status.status === 'failed') && (
+                        <button
+                          onClick={() => handleProcessDocument(doc.id)}
+                          disabled={processingDocuments.has(doc.id)}
+                          className="text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Process document for AI chat"
+                        >
+                          {processingDocuments.has(doc.id) ? (
+                            <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                          ) : (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                            </svg>
+                          )}
+                        </button>
+                      )}
+                      
                       <button
                         onClick={() => handleViewDetails(doc.id)}
                         className="text-blue-600 hover:text-blue-800"

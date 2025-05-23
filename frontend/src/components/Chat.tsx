@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { 
   sendRAGQuery, 
   getConversations, 
@@ -18,6 +19,8 @@ import type { Document } from '../types/document';
 import { toaster } from '../services/toast';
 
 const Chat = () => {
+  const [searchParams] = useSearchParams();
+  
   // State management
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [currentConversation, setCurrentConversation] = useState<ChatConversation | null>(null);
@@ -38,6 +41,22 @@ const Chat = () => {
     loadConversations();
     loadAvailableDocuments();
   }, []);
+
+  // Handle URL parameters for document pre-selection
+  useEffect(() => {
+    const docId = searchParams.get('doc');
+    if (docId && availableDocuments.length > 0) {
+      const doc = availableDocuments.find(d => d.id === docId);
+      if (doc) {
+        setSelectedDocuments([docId]);
+        // Optionally set a default query based on document title
+        const title = searchParams.get('title');
+        if (title) {
+          setQuery(`Tell me about ${decodeURIComponent(title)}`);
+        }
+      }
+    }
+  }, [searchParams, availableDocuments]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
