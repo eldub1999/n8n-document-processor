@@ -318,6 +318,40 @@ WHERE d.is_latest = true;
 - **Status**: Performance optimized, subscription leaks eliminated
 - **Impact**: Massive reduction in database load and improved system stability 
 
+## ✅ MULTIPLE PERMISSIVE POLICIES OPTIMIZATION COMPLETED
+
+### **🚀 Fixed Multiple Permissive Policies Performance Issue**
+- ✅ **Problem Identified**: `document_embeddings` table had multiple permissive policies for `anon` role on SELECT action
+- ✅ **Root Cause**: Both `service_role_embeddings_access` and `users_read_embeddings` policies applied to `public` role
+- ✅ **Performance Impact**: PostgreSQL had to evaluate both policies for every SELECT query unnecessarily
+- ✅ **Solution Applied**: Replaced with role-specific policies to eliminate multiple policy evaluation
+
+### **🔧 Policy Restructuring Completed**
+
+#### **Before (Performance Issues)**:
+- `service_role_embeddings_access` - FOR ALL, TO public (applied to anon role unnecessarily)
+- `users_read_embeddings` - FOR SELECT, TO public (applied to anon role unnecessarily)
+
+#### **After (Optimized)**:
+- ✅ `service_role_embeddings_full_access` - FOR ALL, TO service_role (role-specific)
+- ✅ `authenticated_users_read_embeddings` - FOR SELECT, TO authenticated (role-specific)
+
+### **📊 Performance Benefits**
+- **Query Execution**: Eliminated multiple policy evaluation for anon role SELECT operations
+- **Database Load**: Reduced RLS policy evaluation overhead per query
+- **Role Targeting**: Each policy now only applies to its intended role
+- **Scalability**: Better performance as embedding queries scale up
+
+### **🔍 System-Wide Verification**
+- ✅ **Zero multiple permissive policies detected** across all tables
+- ✅ **All auth functions optimized** with SELECT subquery pattern
+- ✅ **Role-specific policies** properly scoped to intended users
+- ✅ **Performance alerts resolved** - no remaining policy issues
+
+**Result**: Complete elimination of multiple permissive policy performance bottlenecks across the entire system.
+
+---
+
 ## ✅ RLS AUTH FUNCTION OPTIMIZATION COMPLETED
 
 ### **🚀 Performance-Critical RLS Policy Optimization**
