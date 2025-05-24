@@ -2,6 +2,67 @@
 
 ## Status: Paused SA-301 (Advisor Recs) to Apply DB-201 Migrations
 
+## ✨ NEW TASK (ACTIVE)
+
+### **CW-401: End-to-End Code Walkthrough**
+**BRANCH**: `feature/CW-401-e2e-workflow-review`
+**GOAL**: Perform a comprehensive code walkthrough of key system workflows to ensure correctness, consistency, and logical flow, building confidence for E2E testing.
+
+**STATUS**: In Progress
+
+**KEY WORKFLOWS TO REVIEW**:
+1.  **User Authentication & Session Management**
+2.  **Document Upload & Initial Processing** (incl. `document-validation` function)
+3.  **Document Content Processing & Embedding (RAG Pipeline)** (incl. `document-processor` function)
+4.  **Chat Interface & RAG Querying** (incl. `rag-chat` function)
+5.  **Document Versioning & Cleanup** (briefly, triggers and cleanup script)
+
+**SUB-TASKS**:
+- [x] Review User Authentication flow.
+- [x] Review Document Upload and `document-validation` flow.
+- [x] Review `document-processor` Edge Function and RAG pipeline initiation.
+- [x] Review Chat Interface (`rag-chat` function) and query flow.
+- [x] Briefly review document versioning and cleanup logic.
+- [x] Document findings and areas for attention during E2E testing.
+
+**KEY FINDINGS & NOTES FOR E2E TESTING**:
+- **Authentication**: Standard Supabase email/password auth. Session management via Supabase client.
+- **Document Upload (`document-validation` function)**:
+    - Robust flow: Temp upload -> Edge Function validation (hash, duplicate check, type/size) -> DB record & move to final storage.
+    - Frontend (10MB) and backend (50MB) size limits differ slightly (backend is looser, which is fine).
+    - File type validation also differs slightly (frontend no .rtf, backend includes .rtf).
+    - Final storage uses `application/octet-stream`; original content type is in DB but not explicitly set on the stored file object's metadata.
+- **Document Processing (`document-processor` function)**:
+    - Complex function using Vertex AI (Gemini 2.5 Flash) for text extraction/Markdown conversion and Voyage AI (`voyage-large-2`) for embeddings.
+    - Relies on `get_api_key` and `update_processing_progress` RPCs in Supabase.
+    - Vertex AI prompt is tailored for legal docs.
+    - Custom chunking logic for legal text.
+    - Conservative token counting and batching.
+    - Potential for long execution times for large documents (async, so user not blocked).
+- **Chat/RAG (`rag-chat` function)**:
+    - Uses Voyage AI (`voyage-3-large`) for query embeddings (can return just embedding if `generateEmbeddingOnly` is true).
+    - **CRITICAL**: Calls `search_similar_embeddings` RPC for semantic search. Its capability to correctly handle `filter_jurisdictions` and `filter_document_types` (as per a TODO in code) MUST be verified.
+    - Semantic search result transformation passes document metadata (filename, jurisdiction) to LLM context.
+    - Fallback to full-text search is implemented, which also attempts metadata filtering.
+    - Uses Google Vertex AI with `gemini-1.5-flash-latest` for response generation (contrary to top-level comments mentioning Claude Sonnet 4).
+    - Stores conversation in `chat_conversations` and `chat_messages`. Includes document sources, but `embedding_sources` is empty.
+    - **MISSING**: Explicit handling of prior conversation messages being passed to the LLM for multi-turn chat context. Current LLM prompt seems geared for single Q&A based on retrieved context.
+    - Good source formatting in the final API response for frontend display.
+- **Versioning & Cleanup**: 
+    - Handles exact duplicate uploads by rejecting them (based on `content_hash` and `is_latest: true`).
+    - `documents` table has `version` (always 1) and `is_latest` (always true) fields for new uploads.
+    - No explicit "update version" flow for an existing document ID; new unique content results in a new document record.
+    - Manual deletion of document entities via `deleteDocument` function (deletes DB record and storage file).
+    - No automated cleanup scripts for old versions or orphaned files were identified.
+
+**NEXT STEPS**:
+- Conclude CW-401 End-to-End Code Walkthrough.
+- Proceed with E2E testing, paying close attention to the critical points identified (especially the `search_similar_embeddings` RPC and LLM behavior).
+
+- **IMMEDIATE NEXT STEPS**:
+  - Finalize CW-401 walkthrough task.
+  - Confirm readiness for E2E testing with the user.
+
 ---
 
 ## 📝 DOCUMENTATION NOTE (IMPORTANT)
